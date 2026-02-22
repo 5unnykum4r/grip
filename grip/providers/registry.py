@@ -118,6 +118,21 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_models=["moonshot-v1-128k"],
         model_prefix="moonshot/",
     ),
+    ProviderSpec(
+        name="ollama_cloud",
+        display_name="Ollama (Cloud)",
+        api_base="https://ollama.com/v1",
+        api_key_env="OLLAMA_API_KEY",
+        default_models=[
+            "llama3.3",
+            "qwen2.5",
+            "deepseek-r1",
+            "mistral",
+            "gemma2",
+            "phi4",
+        ],
+        model_prefix="ollama_cloud/",
+    ),
     # Local providers
     ProviderSpec(
         name="ollama",
@@ -271,7 +286,7 @@ def create_provider(config: GripConfig) -> LLMProvider:
         api_base,
     )
 
-    if spec.name in ("ollama", "llamacpp", "lmstudio", "vllm") or not api_key:
+    if spec.name in ("ollama", "ollama_cloud", "llamacpp", "lmstudio", "vllm") or not api_key:
         from grip.providers.openai_provider import OpenAICompatProvider
 
         return OpenAICompatProvider(

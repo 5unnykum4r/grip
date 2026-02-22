@@ -40,6 +40,7 @@ _CLOUD_PROVIDERS = [
     "qwen",
     "minimax",
     "moonshot",
+    "ollama_cloud",
 ]
 
 _LOCAL_SUBMENU = ["ollama", "llamacpp", "lmstudio"]

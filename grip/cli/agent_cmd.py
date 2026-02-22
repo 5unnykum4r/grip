@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from typing import Any, Iterable
 
 import typer
 from loguru import logger
@@ -19,17 +20,92 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
+from rich.columns import Columns
+from rich.text import Text
 
 from grip.config import GripConfig, load_config
 from grip.engines.factory import create_engine
 from grip.engines.types import AgentRunResult, EngineProtocol
 from grip.memory import MemoryManager
+from grip.providers.registry import ProviderRegistry, PROVIDERS
 from grip.session import SessionManager
 from grip.workspace import WorkspaceManager
 
 console = Console()
 
 _SESSION_KEY = "cli:interactive"
+
+# All slash commands with metadata for autocomplete and /help display.
+# Structure: {command: (description, category)}
+_COMMANDS: dict[str, tuple[str, str]] = {
+    "/new": ("Start a fresh session and clear terminal", "Session"),
+    "/clear": ("Clear all messages and terminal", "Session"),
+    "/undo": ("Remove last exchange", "Session"),
+    "/rewind": ("Remove last N exchanges (/rewind N)", "Session"),
+    "/compact": ("Summarize, compress history, and clear terminal", "Session"),
+    "/copy": ("Copy last response to clipboard", "Session"),
+    "/model": ("Show or switch model (/model [provider/]name)", "Config"),
+    "/provider": ("Show current provider details", "Config"),
+    "/doctor": ("Check config, provider, and workspace health", "Info"),
+    "/mcp": ("List configured MCP servers", "Info"),
+    "/tasks": ("List scheduled cron tasks", "Info"),
+    "/status": ("Show session and system info", "Info"),
+    "/help": ("Show this command reference", "Info"),
+    "/exit": ("Quit interactive mode", ""),
+}
+
+
+def _build_completer() -> Any:
+    """Create a prompt_toolkit Completer that autocompletes slash commands.
+
+    When the user types `/` or `/c`, matching commands with descriptions
+    are shown in a dropdown. Regular text input is not affected.
+    """
+    from prompt_toolkit.completion import Completer, Completion
+    from prompt_toolkit.document import Document
+
+    class SlashCompleter(Completer):
+        """Autocomplete slash commands with descriptions in the dropdown."""
+
+        def get_completions(
+            self, document: Document, complete_event: Any
+        ) -> Iterable[Completion]:
+            text = document.text_before_cursor.lstrip()
+
+            if not text.startswith("/"):
+                return
+
+            for cmd, (desc, _cat) in _COMMANDS.items():
+                if cmd.startswith(text):
+                    yield Completion(
+                        cmd,
+                        start_position=-len(text),
+                        display=cmd,
+                        display_meta=desc,
+                    )
+
+    return SlashCompleter()
+
+
+def _short_model_name(model_string: str) -> str:
+    """Extract a display-friendly short name from a full model string.
+
+    'openrouter/anthropic/claude-sonnet-4' -> 'claude-sonnet-4'
+    'anthropic/claude-sonnet-4' -> 'claude-sonnet-4'
+    'gpt-4o' -> 'gpt-4o'
+    """
+    parts = model_string.split("/")
+    return parts[-1] if parts else model_string
+
+
+def _resolve_provider_display(model_string: str, config: GripConfig) -> tuple[str, str]:
+    """Resolve a model string to (provider_display_name, bare_model_name)."""
+    explicit_provider = config.agents.defaults.provider
+    try:
+        spec, bare = ProviderRegistry.resolve_model(model_string, provider=explicit_provider)
+        return spec.display_name, bare
+    except ValueError:
+        return "Unknown", model_string
 
 
 def _read_stdin() -> str:
@@ -57,7 +133,6 @@ def agent_command(
         config.agents.defaults.dry_run = True
     _ensure_workspace(config)
 
-    # Read piped stdin (e.g. `cat error.log | grip agent -m "fix this"`)
     piped_input = _read_stdin()
     if piped_input:
         piped_block = f"<stdin>\n{piped_input.strip()}\n</stdin>"
@@ -84,9 +159,6 @@ def _build_engine(config: GripConfig) -> tuple[EngineProtocol, SessionManager, M
     session_mgr = SessionManager(ws.root / "sessions")
     memory_mgr = MemoryManager(ws.root)
 
-    # Seed TOOLS.md at startup so it exists before the first run().
-    # The LiteLLM engine regenerates it on every call to pick up new skills;
-    # the SDK engine does not use TOOLS.md, but generating it here is harmless.
     from grip.skills.loader import SkillsLoader
     from grip.tools import create_default_registry
     from grip.tools.docs import generate_tools_md
@@ -142,6 +214,163 @@ def _print_stats(result: AgentRunResult) -> None:
         console.print(f"[dim]({' | '.join(parts)})[/dim]")
 
 
+def _print_welcome(config: GripConfig, model: str | None) -> None:
+    """Print an enhanced welcome panel with model, provider, and engine info."""
+    from grip import __version__
+
+    active_model = model or config.agents.defaults.model
+    provider_name, bare_model = _resolve_provider_display(active_model, config)
+    engine_type = config.agents.defaults.engine
+
+    info_lines = [
+        f"[bold cyan]grip Interactive Mode[/bold cyan]  [dim]v{__version__}[/dim]",
+        "",
+        f"  [dim]Provider :[/dim]  [white]{provider_name}[/white]",
+        f"  [dim]Model    :[/dim]  [cyan]{bare_model}[/cyan]",
+        f"  [dim]Engine   :[/dim]  [white]{engine_type}[/white]",
+        "",
+        "  Type a message or [cyan]/help[/cyan] for commands.",
+        "  Start typing [cyan]/[/cyan] to autocomplete commands.",
+    ]
+    console.print(Panel("\n".join(info_lines), expand=False, border_style="cyan"))
+
+
+def _print_help() -> None:
+    """Print categorized command help using a Rich Table."""
+    table = Table(
+        show_header=True,
+        header_style="bold",
+        box=None,
+        padding=(0, 2),
+        expand=False,
+    )
+    table.add_column("Command", style="cyan", no_wrap=True)
+    table.add_column("Description", style="white")
+
+    categories_order = ["Session", "Config", "Info"]
+    for category in categories_order:
+        table.add_row(f"[bold dim]{category}[/bold dim]", "")
+        for cmd, (desc, cat) in _COMMANDS.items():
+            if cat == category:
+                table.add_row(f"  {cmd}", desc)
+
+    # Add /exit at the bottom outside categories
+    table.add_row("")
+    table.add_row("  [cyan]/exit[/cyan]", "Quit interactive mode")
+
+    console.print(Panel(table, title="[bold]Commands[/bold]", expand=False, border_style="dim"))
+
+
+def _print_status(
+    session_key: str,
+    session_mgr: SessionManager,
+    memory_mgr: MemoryManager,
+    model: str | None,
+    config: GripConfig,
+) -> None:
+    """Print an enhanced status panel with session, model, and memory info."""
+    session = session_mgr.get_or_create(session_key)
+    active_model = model or config.agents.defaults.model
+    provider_name, bare_model = _resolve_provider_display(active_model, config)
+    engine_type = config.agents.defaults.engine
+
+    mem = memory_mgr.read_memory()
+    mem_lines = len(mem.strip().splitlines()) if mem.strip() else 0
+
+    has_summary = "Yes" if session.summary else "No"
+
+    info_lines = [
+        f"  [dim]Session  :[/dim]  [white]{session_key}[/white]",
+        f"  [dim]Messages :[/dim]  [white]{session.message_count}[/white]",
+        f"  [dim]Summary  :[/dim]  [white]{has_summary}[/white]",
+        "",
+        f"  [dim]Provider :[/dim]  [white]{provider_name}[/white]",
+        f"  [dim]Model    :[/dim]  [cyan]{bare_model}[/cyan]",
+        f"  [dim]Engine   :[/dim]  [white]{engine_type}[/white]",
+        "",
+        f"  [dim]Memory   :[/dim]  [white]{mem_lines} facts[/white]",
+    ]
+    console.print(Panel("\n".join(info_lines), title="[bold]Status[/bold]", expand=False, border_style="dim"))
+
+
+def _print_doctor(
+    session_key: str,
+    session_mgr: SessionManager,
+    model: str | None,
+    config: GripConfig,
+) -> None:
+    """Run diagnostic checks and display results with pass/fail indicators."""
+    checks: list[tuple[str, bool, str]] = []
+
+    # Config check
+    checks.append(("Config loaded", True, ""))
+
+    # Provider / API key check
+    active_model = model or config.agents.defaults.model
+    provider_name, bare_model = _resolve_provider_display(active_model, config)
+
+    provider_key_name = active_model.split("/")[0] if "/" in active_model else ""
+    provider_cfg = config.providers.get(provider_key_name)
+    if provider_cfg and provider_cfg.api_key:
+        checks.append((f"Provider '{provider_name}' API key", True, ""))
+    elif provider_key_name:
+        checks.append((f"Provider '{provider_name}' API key", False, "May be set via env var"))
+    else:
+        checks.append((f"Provider '{provider_name}'", True, "No key required"))
+
+    # Workspace check
+    ws_path = config.agents.defaults.workspace.expanduser().resolve()
+    ws_ok = (ws_path / "AGENT.md").exists()
+    checks.append(("Workspace initialized", ws_ok, str(ws_path)))
+
+    # MCP servers
+    mcp_count = len(config.tools.mcp_servers)
+    checks.append((f"MCP servers ({mcp_count})", mcp_count > 0 or True, ""))
+
+    # Session state
+    session = session_mgr.get_or_create(session_key)
+    checks.append((f"Session ({session.message_count} messages)", True, session_key))
+
+    lines: list[str] = []
+    for label, passed, detail in checks:
+        icon = "[green]PASS[/green]" if passed else "[yellow]WARN[/yellow]"
+        line = f"  {icon}  {label}"
+        if detail:
+            line += f"  [dim]({detail})[/dim]"
+        lines.append(line)
+
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title="[bold]grip Doctor[/bold]",
+            expand=False,
+            border_style="dim",
+        )
+    )
+
+
+def _print_model_info(model: str | None, config: GripConfig) -> None:
+    """Print detailed model and provider information."""
+    active_model = model or config.agents.defaults.model
+    provider_name, bare_model = _resolve_provider_display(active_model, config)
+
+    lines = [
+        f"  [dim]Provider   :[/dim]  [white]{provider_name}[/white]",
+        f"  [dim]Model      :[/dim]  [cyan]{bare_model}[/cyan]",
+        f"  [dim]Full ID    :[/dim]  [dim]{active_model}[/dim]",
+    ]
+
+    # Show other available providers for switching
+    provider_names = [s.display_name for s in PROVIDERS[:9]]
+    lines.append("")
+    lines.append(f"  [dim]Switch with:[/dim]  /model [cyan]provider/model-name[/cyan]")
+    lines.append(f"  [dim]Providers  :[/dim]  {', '.join(provider_names[:5])}, ...")
+
+    console.print(
+        Panel("\n".join(lines), title="[bold]Model[/bold]", expand=False, border_style="dim")
+    )
+
+
 async def _one_shot(
     config: GripConfig, message: str, *, model: str | None, no_markdown: bool
 ) -> None:
@@ -156,30 +385,35 @@ async def _one_shot(
 
 
 async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bool) -> None:
-    """Run an interactive chat session with prompt-toolkit input."""
+    """Run an interactive chat session with slash-command autocomplete and enhanced UI."""
     from prompt_toolkit import PromptSession
     from prompt_toolkit.history import FileHistory
+    from prompt_toolkit.formatted_text import HTML
 
     engine, session_mgr, memory_mgr = _build_engine(config)
     session_key = _SESSION_KEY
 
     history_dir = Path("~/.grip/history").expanduser()
     history_dir.mkdir(parents=True, exist_ok=True)
+
+    completer = _build_completer()
+
     prompt_session: PromptSession[str] = PromptSession(
         history=FileHistory(str(history_dir / "cli_history")),
+        completer=completer,
+        complete_while_typing=True,
     )
 
-    console.print(
-        Panel(
-            "[bold cyan]grip Interactive Mode[/bold cyan]\n"
-            "Type your message and press Enter. Type [cyan]/help[/cyan] for commands.",
-            expand=False,
-        )
-    )
+    _print_welcome(config, model)
+
+    def _make_prompt() -> HTML:
+        """Build a dynamic prompt showing the active model's short name."""
+        short = _short_model_name(model or config.agents.defaults.model)
+        return HTML(f"\n<b>grip</b> <style fg='ansibrightcyan'>({short})</style><b>&gt;</b> ")
 
     while True:
         try:
-            user_input = await asyncio.to_thread(prompt_session.prompt, "\ngrip> ")
+            user_input = await asyncio.to_thread(prompt_session.prompt, _make_prompt())
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Goodbye![/dim]")
             break
@@ -201,6 +435,8 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
             elif cmd == "/new":
                 await engine.reset_session(session_key)
                 session_key = _SESSION_KEY
+                console.clear()
+                _print_welcome(config, model)
                 console.print("[green]New session started.[/green]")
                 continue
 
@@ -210,7 +446,9 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
                 session.messages.clear()
                 session.summary = None
                 session_mgr.save(session)
-                console.print(f"[green]Cleared {count} messages from session.[/green]")
+                console.clear()
+                _print_welcome(config, model)
+                console.print(f"[green]Cleared {count} messages.[/green]")
                 continue
 
             elif cmd == "/undo":
@@ -247,17 +485,29 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
                 if session.message_count < 4:
                     console.print("[yellow]Session too short to compact.[/yellow]")
                     continue
+                old_count = session.message_count
                 with Live(
                     Spinner("dots", text="Compacting session..."),
                     console=console,
                     transient=True,
                 ):
                     await engine.consolidate_session(session_key)
-                # Re-read the session to get updated message count after compaction
+
                 session = session_mgr.get_or_create(session_key)
+                console.clear()
+                _print_welcome(config, model)
                 console.print(
-                    f"[green]Session compacted. {session.message_count} messages remain.[/green]"
+                    f"[green]Session compacted: {old_count} -> {session.message_count} messages.[/green]"
                 )
+                if session.summary:
+                    console.print(
+                        Panel(
+                            session.summary,
+                            title="[bold]Conversation Summary[/bold]",
+                            expand=False,
+                            border_style="dim",
+                        )
+                    )
                 continue
 
             elif cmd == "/copy":
@@ -296,34 +546,21 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
             elif cmd == "/model":
                 if args_str:
                     model = args_str
-                    console.print(f"[green]Model switched to: {model}[/green]")
+                    provider_name, bare = _resolve_provider_display(model, config)
+                    console.print(
+                        f"[green]Model switched to [cyan]{bare}[/cyan] "
+                        f"via [white]{provider_name}[/white][/green]"
+                    )
                 else:
-                    active = model or config.agents.defaults.model
-                    console.print(f"  Active model: [cyan]{active}[/cyan]")
+                    _print_model_info(model, config)
+                continue
+
+            elif cmd == "/provider":
+                _print_model_info(model, config)
                 continue
 
             elif cmd == "/doctor":
-                console.print("[bold]grip Doctor[/bold]")
-                console.print("  [green]Config loaded[/green]")
-                model_str = model or config.agents.defaults.model
-                provider_name = model_str.split("/")[0] if "/" in model_str else ""
-                provider_cfg = config.providers.get(provider_name)
-                if provider_cfg and provider_cfg.api_key:
-                    console.print(f"  [green]Provider '{provider_name}' API key set[/green]")
-                elif provider_name:
-                    console.print(
-                        f"  [yellow]Provider '{provider_name}' API key not in config "
-                        f"(may be set via env var)[/yellow]"
-                    )
-                ws_path = config.agents.defaults.workspace.expanduser().resolve()
-                if (ws_path / "AGENT.md").exists():
-                    console.print(f"  [green]Workspace initialized: {ws_path}[/green]")
-                else:
-                    console.print(f"  [yellow]Workspace missing AGENT.md: {ws_path}[/yellow]")
-                mcp_count = len(config.tools.mcp_servers)
-                console.print(f"  MCP servers configured: {mcp_count}")
-                session = session_mgr.get_or_create(session_key)
-                console.print(f"  Session messages: {session.message_count}")
+                _print_doctor(session_key, session_mgr, model, config)
                 continue
 
             elif cmd == "/mcp":
@@ -331,10 +568,18 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
                 if not servers:
                     console.print("[dim]No MCP servers configured.[/dim]")
                     continue
-                console.print("[bold]MCP Servers[/bold]")
+                lines = []
                 for name, srv in servers.items():
                     transport = srv.url if srv.url else f"{srv.command} {' '.join(srv.args)}"
-                    console.print(f"  [cyan]{name}[/cyan]  {transport}")
+                    lines.append(f"  [cyan]{name}[/cyan]  {transport}")
+                console.print(
+                    Panel(
+                        "\n".join(lines),
+                        title="[bold]MCP Servers[/bold]",
+                        expand=False,
+                        border_style="dim",
+                    )
+                )
                 continue
 
             elif cmd == "/tasks":
@@ -343,38 +588,26 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
                 if not cron_dir.exists() or not any(cron_dir.iterdir()):
                     console.print("[dim]No scheduled tasks found.[/dim]")
                     continue
-                console.print("[bold]Scheduled Tasks[/bold]")
+                lines = []
                 for f in sorted(cron_dir.iterdir()):
                     if f.is_file():
-                        console.print(f"  [cyan]{f.stem}[/cyan]  {f.suffix}")
+                        lines.append(f"  [cyan]{f.stem}[/cyan]  {f.suffix}")
+                console.print(
+                    Panel(
+                        "\n".join(lines),
+                        title="[bold]Scheduled Tasks[/bold]",
+                        expand=False,
+                        border_style="dim",
+                    )
+                )
                 continue
 
             elif cmd == "/status":
-                session = session_mgr.get_or_create(session_key)
-                console.print(f"  Session: [cyan]{session_key}[/cyan]")
-                console.print(f"  Messages: {session.message_count}")
-                console.print(f"  Model: [cyan]{model or config.agents.defaults.model}[/cyan]")
-                mem = memory_mgr.read_memory()
-                mem_lines = len(mem.strip().splitlines()) if mem.strip() else 0
-                console.print(f"  Memory facts: ~{mem_lines} lines")
+                _print_status(session_key, session_mgr, memory_mgr, model, config)
                 continue
 
             elif cmd == "/help":
-                console.print(
-                    "  [cyan]/new[/cyan]        Start a fresh session\n"
-                    "  [cyan]/clear[/cyan]      Clear all messages in current session\n"
-                    "  [cyan]/undo[/cyan]       Remove last exchange\n"
-                    "  [cyan]/rewind N[/cyan]   Remove last N exchanges\n"
-                    "  [cyan]/compact[/cyan]    Summarize and compress session history\n"
-                    "  [cyan]/copy[/cyan]       Copy last response to clipboard\n"
-                    "  [cyan]/model[/cyan]      Show or switch model (/model NAME)\n"
-                    "  [cyan]/doctor[/cyan]     Check config, provider, and workspace health\n"
-                    "  [cyan]/mcp[/cyan]        List configured MCP servers\n"
-                    "  [cyan]/tasks[/cyan]      List scheduled cron tasks\n"
-                    "  [cyan]/status[/cyan]     Session info\n"
-                    "  [cyan]/help[/cyan]       This message\n"
-                    "  [cyan]/exit[/cyan]       Quit"
-                )
+                _print_help()
                 continue
 
             else:

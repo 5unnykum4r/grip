@@ -16,19 +16,19 @@
   <img src="https://img.shields.io/badge/python-3.12%2B-blue" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
   <img src="https://img.shields.io/badge/engine-Claude%20Agent%20SDK-blueviolet" alt="Claude Agent SDK">
-  <img src="https://img.shields.io/badge/providers-14-orange" alt="14 LLM Providers">
+  <img src="https://img.shields.io/badge/providers-15-orange" alt="15 LLM Providers">
 </p>
 
 ---
 
-grip is a self-hostable AI agent platform built with Python and [uv](https://docs.astral.sh/uv/). It uses the **Claude Agent SDK** as its primary engine for Claude models, with a **LiteLLM fallback** for 14+ other providers (OpenAI, DeepSeek, Groq, Gemini, Ollama, etc.). Chat over Telegram/Discord/Slack, schedule cron tasks, orchestrate multi-agent workflows, and expose a secure REST API — all from a single process.
+grip is a self-hostable AI agent platform built with Python and [uv](https://docs.astral.sh/uv/). It uses the **Claude Agent SDK** as its primary engine for Claude models, with a **LiteLLM fallback** for 15+ other providers (OpenAI, DeepSeek, Groq, Gemini, Ollama local & cloud, etc.). Chat over Telegram/Discord/Slack, schedule cron tasks, orchestrate multi-agent workflows, and expose a secure REST API — all from a single process.
 
 ## Features
 
 | Category | Details |
 |----------|---------|
 | **Dual Engine** | Claude Agent SDK (primary, recommended) + LiteLLM fallback for non-Claude models |
-| **LLM Providers** | Anthropic (via SDK), OpenRouter, OpenAI, DeepSeek, Groq, Google Gemini, Qwen, MiniMax, Moonshot (Kimi), Ollama, vLLM, Llama.cpp, LM Studio, and any OpenAI-compatible API |
+| **LLM Providers** | Anthropic (via SDK), OpenRouter, OpenAI, DeepSeek, Groq, Google Gemini, Qwen, MiniMax, Moonshot (Kimi), Ollama (Cloud), Ollama (Local), vLLM, Llama.cpp, LM Studio, and any OpenAI-compatible API |
 | **Built-in Tools** | File read/write/edit/append/list/delete, shell execution, web search (Brave + DuckDuckGo), web fetch, messaging, subagent spawning, finance (yfinance), MCP tools |
 | **Chat Channels** | Telegram (bot commands, photos, documents, voice), Discord, Slack (Socket Mode) |
 | **REST API** | FastAPI with bearer auth, rate limiting, audit logging, security headers, 21 endpoints |
@@ -36,6 +36,7 @@ grip is a self-hostable AI agent platform built with Python and [uv](https://doc
 | **Memory** | Dual-layer (MEMORY.md + HISTORY.md) with TF-IDF retrieval, auto-consolidation, and semantic caching |
 | **Scheduling** | Cron jobs with channel delivery, heartbeat service, natural language scheduling |
 | **Skills** | 18 built-in markdown skills, workspace overrides, install/remove via CLI |
+| **Security** | Directory trust model, shell deny-list (50+ patterns), secret sanitizer, Shield runtime threat feed policy, token tracking, rate limiting |
 | **Observability** | OpenTelemetry tracing, in-memory metrics, crash recovery, config validation |
 
 ## Engine Modes
@@ -45,7 +46,7 @@ grip uses a dual-engine architecture controlled by the `engine` config field:
 | Engine | Config Value | Use Case |
 |--------|-------------|----------|
 | **Claude Agent SDK** | `claude_sdk` (default) | Anthropic Claude models — full agentic loop, tool execution, and context management handled by the SDK |
-| **LiteLLM** | `litellm` | Non-Claude models (OpenAI, DeepSeek, Groq, Gemini, Ollama, etc.) — uses grip's internal agent loop with LiteLLM for API calls |
+| **LiteLLM** | `litellm` | Non-Claude models (OpenAI, DeepSeek, Groq, Gemini, Ollama Cloud/Local, etc.) — uses grip's internal agent loop with LiteLLM for API calls |
 
 Switch engines via config:
 
@@ -96,7 +97,7 @@ uv tool install .
 
 ### Optional: Multi-Model Support
 
-To use non-Claude models (OpenAI, DeepSeek, Groq, Gemini, Ollama, etc.), install the LiteLLM extra:
+To use non-Claude models (OpenAI, DeepSeek, Groq, Gemini, Ollama Cloud/Local, etc.), install the LiteLLM extra:
 
 ```bash
 uv sync --extra litellm
@@ -117,7 +118,7 @@ grip onboard
 ```
 
 The wizard walks you through:
-- Choosing your engine: **Claude Agent SDK** (recommended) or LiteLLM (14+ providers)
+- Choosing your engine: **Claude Agent SDK** (recommended) or LiteLLM (15+ providers)
 - Entering your API key
 - Choosing a default model
 - Initializing the workspace (`~/.grip/workspace/`)
@@ -500,6 +501,7 @@ The API is designed for safe self-hosting:
 - **Audit logging** — every request logged (method, path, status, duration, IP)
 - **Directory Trust Model** — grip is restricted to its workspace by default. Access to external directories must be explicitly granted via CLI prompt or the `/trust` command. [Learn more](#security-architecture).
 - **Shell Safety Guards** — every shell command is scanned against a comprehensive deny-list (rm -rf /, shutdown, etc.) before execution. [Learn more](#security-architecture).
+- **Shield Policy** — context-based runtime threat feed injected into the system prompt. Evaluates tool calls, skill execution, MCP interactions, network requests, and secret access against active threats. [Learn more](#security-architecture).
 - **Sanitized errors** — no stack traces or file paths in responses
 - **Tool execute gated** — disabled by default to prevent arbitrary command execution over HTTP
 - **No config mutation over HTTP** — prevents redirect attacks
@@ -517,7 +519,27 @@ Grip is sandboxed to its workspace by default. Unlike traditional agents with un
 - **Explicit Consent**: To access any directory outside the workspace (e.g., `~/Downloads`), the user must explicitly "trust" it.
 - **Persistent Safety**: Trust decisions are saved and remembered across sessions.
 
-#### 2. Shell Command Deny-List
+#### 2. Shield Policy (Runtime Threat Feed)
+
+The agent's system prompt includes a `SHIELD.md` policy that defines how to evaluate actions against a threat feed before execution. This is a context-level safety layer that works alongside the code-level guards.
+
+**Scopes covered:** `prompt`, `skill.install`, `skill.execute`, `tool.call`, `network.egress`, `secrets.read`, `mcp`
+
+**Enforcement actions:**
+- **block** — stop immediately, no execution
+- **require_approval** — ask the user for confirmation before proceeding
+- **log** — continue normally (default when no threat matches)
+
+**How it works:**
+1. Active threats are injected into the `## Active Threats` section of SHIELD.md at runtime
+2. Before acting on a scoped event, the agent evaluates it against loaded threats
+3. Matching uses category/scope alignment, `recommendation_agent` directives, and exact string fallback
+4. Confidence threshold (>= 0.85) determines enforceability; below that, the action defaults to `require_approval`
+5. When multiple threats match, the strictest action wins: `block > require_approval > log`
+
+The policy is stored at `workspace/SHIELD.md` and can be customized per workspace.
+
+#### 3. Shell Command Deny-List
 
 Every command the agent tries to run via the `exec` tool is scanned against a robust list of **50+ dangerous patterns** before execution:
 
