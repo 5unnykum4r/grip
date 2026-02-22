@@ -30,6 +30,7 @@ from grip.api.middleware import (
     RequestSizeLimitMiddleware,
     SecurityHeadersMiddleware,
 )
+from grip import __version__
 from grip.api.rate_limit import SlidingWindowRateLimiter
 from grip.api.routers import chat, health, management, sessions, tools
 from grip.config.schema import GripConfig
@@ -103,7 +104,7 @@ def create_api_app(config: GripConfig, config_path: Path | None = None) -> FastA
 
     app = FastAPI(
         title="grip API",
-        version="0.1.1",
+        version=__version__,
         description="Async-first agentic AI platform REST API",
         docs_url=None,
         redoc_url=None,

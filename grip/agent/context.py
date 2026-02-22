@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+from grip import __version__
 from grip.providers.types import LLMMessage
 from grip.workspace.manager import WorkspaceManager
 
@@ -187,7 +188,7 @@ class ContextBuilder:
             f"- Current UTC time: {now.strftime('%Y-%m-%d %H:%M:%S')}",
             f"- Platform: {platform.system()} {platform.release()}",
             f"- Python: {platform.python_version()}",
-            "- grip version: 0.1.1",
+            f"- grip version: {__version__}",
         ]
         if session_key:
             lines.append(f"- Session key: {session_key}")

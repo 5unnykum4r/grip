@@ -13,6 +13,8 @@ Stop:  Ctrl+C (SIGINT) or SIGTERM for graceful shutdown
 
 from __future__ import annotations
 
+from grip import __version__
+
 import asyncio
 import contextlib
 import signal
@@ -421,7 +423,7 @@ def _start_api_server(
 
     app = FastAPI(
         title="grip API",
-        version="0.1.1",
+        version=__version__,
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
