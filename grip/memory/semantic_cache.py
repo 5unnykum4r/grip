@@ -51,10 +51,7 @@ class SemanticCache:
             data = json.loads(self._cache_file.read_text(encoding="utf-8"))
             now = time.time()
             # Discard expired entries on load
-            return {
-                k: v for k, v in data.items()
-                if now - v.get("created_at", 0) < self._ttl
-            }
+            return {k: v for k, v in data.items() if now - v.get("created_at", 0) < self._ttl}
         except (json.JSONDecodeError, KeyError):
             logger.warning("Corrupt semantic cache file, resetting")
             return {}

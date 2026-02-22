@@ -91,6 +91,7 @@ def init_tracing(service_name: str = "grip", endpoint: str = "") -> bool:
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
                 OTLPSpanExporter,
             )
+
             exporter = OTLPSpanExporter(endpoint=endpoint)
         else:
             exporter = ConsoleSpanExporter()

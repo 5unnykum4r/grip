@@ -34,10 +34,7 @@ _TEMPLATES: dict[str, str] = {
         "- Vary sentence structure — mix short and long sentences; avoid walls of bullets for narrative content.\n"
     ),
     "IDENTITY.md": (
-        "# Identity\n\n"
-        "- **Name:** grip\n"
-        "- **Role:** Personal AI assistant\n"
-        "- **Version:** 0.1.1\n"
+        "# Identity\n\n- **Name:** grip\n- **Role:** Personal AI assistant\n- **Version:** 0.1.1\n"
     ),
     "SOUL.md": (
         "# Soul\n\n"
@@ -105,12 +102,10 @@ _TEMPLATES: dict[str, str] = {
         "None loaded. Threats are injected at runtime via the threat feed.\n"
     ),
     "memory/MEMORY.md": (
-        "# Long-Term Memory\n\n"
-        "Key facts and decisions are stored here by the agent.\n"
+        "# Long-Term Memory\n\nKey facts and decisions are stored here by the agent.\n"
     ),
     "memory/HISTORY.md": (
-        "# Conversation History Log\n\n"
-        "Searchable summary of past conversations.\n"
+        "# Conversation History Log\n\nSearchable summary of past conversations.\n"
     ),
 }
 
@@ -186,6 +181,7 @@ class WorkspaceManager:
     def read_builtin_skills(self) -> str:
         """Read content of skills that are marked as always_loaded."""
         from grip.skills.loader import SkillsLoader
+
         loader = SkillsLoader(self._root)
         loader.scan()
         return loader.get_always_loaded_content()

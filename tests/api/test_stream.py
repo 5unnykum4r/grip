@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -21,12 +19,8 @@ def _build_test_app(engine_mock: AsyncMock) -> FastAPI:
 
     app.state.auth_token = "test-token-123"
     app.state.engine = engine_mock
-    app.state.ip_rate_limiter = SlidingWindowRateLimiter(
-        max_requests=100, window_seconds=60
-    )
-    app.state.token_rate_limiter = SlidingWindowRateLimiter(
-        max_requests=100, window_seconds=60
-    )
+    app.state.ip_rate_limiter = SlidingWindowRateLimiter(max_requests=100, window_seconds=60)
+    app.state.token_rate_limiter = SlidingWindowRateLimiter(max_requests=100, window_seconds=60)
     return app
 
 

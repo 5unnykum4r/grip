@@ -183,6 +183,7 @@ class CronService:
         """Determine if a cron job should fire based on its schedule."""
         try:
             from croniter import croniter
+
             if job.last_run:
                 last = datetime.fromisoformat(job.last_run)
             else:
@@ -251,7 +252,8 @@ class CronService:
             logger.error("Cron job {} timed out after {}s", job.id, timeout)
             if job.reply_to and self._bus:
                 await self._publish_result(
-                    job, f"Cron job '{job.name}' timed out after {self._config.exec_timeout_minutes} minutes."
+                    job,
+                    f"Cron job '{job.name}' timed out after {self._config.exec_timeout_minutes} minutes.",
                 )
         except Exception as exc:
             logger.error("Cron job {} failed: {}", job.id, exc)
@@ -269,11 +271,13 @@ class CronService:
 
         channel, chat_id = parts
         try:
-            await self._bus.publish_outbound(OutboundMessage(
-                channel=channel,
-                chat_id=chat_id,
-                text=text,
-            ))
+            await self._bus.publish_outbound(
+                OutboundMessage(
+                    channel=channel,
+                    chat_id=chat_id,
+                    text=text,
+                )
+            )
             logger.info("Cron job {} result published to {}:{}", job.id, channel, chat_id)
         except Exception as exc:
             logger.error("Failed to publish cron result for {}: {}", job.id, exc)

@@ -78,8 +78,7 @@ class StockQuoteTool(Tool):
             try:
                 info = await asyncio.to_thread(lambda s=symbol: yf.Ticker(s).info)
                 if not info or (
-                    info.get("regularMarketPrice") is None
-                    and info.get("currentPrice") is None
+                    info.get("regularMarketPrice") is None and info.get("currentPrice") is None
                 ):
                     lines.append(f"{symbol}: No data found. Verify the ticker symbol.")
                     continue
@@ -156,8 +155,7 @@ class StockHistoryTool(Tool):
                 "interval": {
                     "type": "string",
                     "description": (
-                        "Data granularity: 1m, 5m, 15m, 30m, 1h, 1d, 1wk, 1mo. "
-                        "Defaults to '1d'."
+                        "Data granularity: 1m, 5m, 15m, 30m, 1h, 1d, 1wk, 1mo. Defaults to '1d'."
                     ),
                 },
                 "rows": {
@@ -184,7 +182,19 @@ class StockHistoryTool(Tool):
 
         valid_periods = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"}
         valid_intervals = {
-            "1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo",
+            "1m",
+            "2m",
+            "5m",
+            "15m",
+            "30m",
+            "60m",
+            "90m",
+            "1h",
+            "1d",
+            "5d",
+            "1wk",
+            "1mo",
+            "3mo",
         }
 
         if period not in valid_periods:
@@ -289,12 +299,8 @@ class CompanyInfoTool(Tool):
                 if isinstance(revenue, (int, float)) and revenue > 0
                 else "N/A"
             )
-            margin_str = (
-                f"{gross_margins:.1%}" if isinstance(gross_margins, float) else "N/A"
-            )
-            div_str = (
-                f"{dividend_yield:.2%}" if isinstance(dividend_yield, float) else "N/A"
-            )
+            margin_str = f"{gross_margins:.1%}" if isinstance(gross_margins, float) else "N/A"
+            div_str = f"{dividend_yield:.2%}" if isinstance(dividend_yield, float) else "N/A"
 
             lines = [
                 f"=== {name} ({symbol}) ===",

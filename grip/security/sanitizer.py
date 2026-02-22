@@ -33,13 +33,17 @@ SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # Generic patterns
     ("Bearer token in header", re.compile(r"(?i)bearer\s+[A-Za-z0-9\-._~+/]+=*")),
     ("Private key block", re.compile(r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----")),
-    ("Connection string with password", re.compile(
-        r"(?i)(postgres|mysql|mongodb|redis)://[^:]+:[^@]+@"
-    )),
-    ("Generic high-entropy secret", re.compile(
-        r"(?i)(api[_-]?key|api[_-]?secret|auth[_-]?token|secret[_-]?key|"
-        r"access[_-]?token|private[_-]?key|password)\s*[=:]\s*['\"]?[A-Za-z0-9+/=_\-]{16,}['\"]?"
-    )),
+    (
+        "Connection string with password",
+        re.compile(r"(?i)(postgres|mysql|mongodb|redis)://[^:]+:[^@]+@"),
+    ),
+    (
+        "Generic high-entropy secret",
+        re.compile(
+            r"(?i)(api[_-]?key|api[_-]?secret|auth[_-]?token|secret[_-]?key|"
+            r"access[_-]?token|private[_-]?key|password)\s*[=:]\s*['\"]?[A-Za-z0-9+/=_\-]{16,}['\"]?"
+        ),
+    ),
 ]
 
 

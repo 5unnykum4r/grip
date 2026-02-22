@@ -6,8 +6,8 @@ import pytest
 
 from grip.tools.base import ToolContext
 from grip.tools.email_compose import (
-    EmailComposeTool,
     _TONE_TEMPLATES,
+    EmailComposeTool,
     _compose_email,
     create_email_compose_tools,
 )
@@ -35,12 +35,16 @@ class TestComposeEmail:
         assert "Priority" in draft.upper() or "HIGH" in draft
 
     def test_apologetic_has_apologize(self):
-        draft = _compose_email("apologetic", "Client", "Support", "Issue", "We are fixing it.", context="the outage")
+        draft = _compose_email(
+            "apologetic", "Client", "Support", "Issue", "We are fixing it.", context="the outage"
+        )
         assert "apologize" in draft.lower()
         assert "outage" in draft
 
     def test_followup_references_prior(self):
-        draft = _compose_email("followup", "Partner", "Me", "Update", "Any news?", context="the proposal")
+        draft = _compose_email(
+            "followup", "Partner", "Me", "Update", "Any news?", context="the proposal"
+        )
         assert "Following up" in draft
         assert "proposal" in draft
 
@@ -61,13 +65,16 @@ class TestEmailComposeTool:
     @pytest.mark.asyncio
     async def test_creates_draft_file(self, ctx):
         tool = EmailComposeTool()
-        result = await tool.execute({
-            "tone": "formal",
-            "recipient": "John",
-            "sender": "Jane",
-            "subject": "Test Email",
-            "body": "This is a test.",
-        }, ctx)
+        result = await tool.execute(
+            {
+                "tone": "formal",
+                "recipient": "John",
+                "sender": "Jane",
+                "subject": "Test Email",
+                "body": "This is a test.",
+            },
+            ctx,
+        )
         assert "Draft saved" in result
         drafts = list((ctx.workspace_path / "drafts").glob("*.md"))
         assert len(drafts) == 1
@@ -75,23 +82,29 @@ class TestEmailComposeTool:
     @pytest.mark.asyncio
     async def test_missing_recipient_returns_error(self, ctx):
         tool = EmailComposeTool()
-        result = await tool.execute({
-            "tone": "formal",
-            "recipient": "",
-            "sender": "Jane",
-            "subject": "Test",
-            "body": "Test body",
-        }, ctx)
+        result = await tool.execute(
+            {
+                "tone": "formal",
+                "recipient": "",
+                "sender": "Jane",
+                "subject": "Test",
+                "body": "Test body",
+            },
+            ctx,
+        )
         assert "Error" in result
 
     @pytest.mark.asyncio
     async def test_unknown_tone_returns_error(self, ctx):
         tool = EmailComposeTool()
-        result = await tool.execute({
-            "tone": "sarcastic",
-            "recipient": "John",
-            "sender": "Jane",
-            "subject": "Test",
-            "body": "Test body",
-        }, ctx)
+        result = await tool.execute(
+            {
+                "tone": "sarcastic",
+                "recipient": "John",
+                "sender": "Jane",
+                "subject": "Test",
+                "body": "Test body",
+            },
+            ctx,
+        )
         assert "Error" in result

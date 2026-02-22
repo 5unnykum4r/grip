@@ -14,7 +14,7 @@ class TestSlackCommandParsing:
         assert set(_SLACK_COMMANDS.keys()) == expected
 
     def test_command_descriptions_are_strings(self):
-        for cmd, desc in _SLACK_COMMANDS.items():
+        for _cmd, desc in _SLACK_COMMANDS.items():
             assert isinstance(desc, str)
             assert len(desc) > 0
 
@@ -137,4 +137,5 @@ class TestSlackCommandHandling:
     async def test_slack_and_discord_commands_match(self):
         """Discord and Slack should support the same set of commands."""
         from grip.channels.discord import _DISCORD_COMMANDS
+
         assert set(_SLACK_COMMANDS.keys()) == set(_DISCORD_COMMANDS.keys())

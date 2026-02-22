@@ -16,37 +16,44 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 from grip.tools.base import Tool, ToolContext
 
 _DAY_MAP = {
-    "monday": "1", "tuesday": "2", "wednesday": "3", "thursday": "4",
-    "friday": "5", "saturday": "6", "sunday": "0",
-    "mon": "1", "tue": "2", "wed": "3", "thu": "4",
-    "fri": "5", "sat": "6", "sun": "0",
+    "monday": "1",
+    "tuesday": "2",
+    "wednesday": "3",
+    "thursday": "4",
+    "friday": "5",
+    "saturday": "6",
+    "sunday": "0",
+    "mon": "1",
+    "tue": "2",
+    "wed": "3",
+    "thu": "4",
+    "fri": "5",
+    "sat": "6",
+    "sun": "0",
 }
 
 _NL_PATTERNS: list[tuple[re.Pattern[str], str | callable]] = [
-    (re.compile(r"every\s+(\d+)\s+minutes?", re.IGNORECASE),
-     lambda m: f"*/{m.group(1)} * * * *"),
-    (re.compile(r"every\s+(\d+)\s+hours?", re.IGNORECASE),
-     lambda m: f"0 */{m.group(1)} * * *"),
-    (re.compile(r"every\s+minute", re.IGNORECASE),
-     lambda m: "* * * * *"),
-    (re.compile(r"every\s+hour", re.IGNORECASE),
-     lambda m: "0 * * * *"),
-    (re.compile(r"every\s+day\s+at\s+(\d{1,2})\s*(am|pm)?", re.IGNORECASE),
-     None),
-    (re.compile(
-        r"every\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)"
-        r"\s+at\s+(\d{1,2})\s*(am|pm)?",
-        re.IGNORECASE,
-    ), None),
-    (re.compile(r"every\s+month\s+on\s+the\s+(\d{1,2})(st|nd|rd|th)?", re.IGNORECASE),
-     lambda m: f"0 0 {m.group(1)} * *"),
-    (re.compile(r"every\s+weekday\s+at\s+(\d{1,2})\s*(am|pm)?", re.IGNORECASE),
-     None),
+    (re.compile(r"every\s+(\d+)\s+minutes?", re.IGNORECASE), lambda m: f"*/{m.group(1)} * * * *"),
+    (re.compile(r"every\s+(\d+)\s+hours?", re.IGNORECASE), lambda m: f"0 */{m.group(1)} * * *"),
+    (re.compile(r"every\s+minute", re.IGNORECASE), lambda m: "* * * * *"),
+    (re.compile(r"every\s+hour", re.IGNORECASE), lambda m: "0 * * * *"),
+    (re.compile(r"every\s+day\s+at\s+(\d{1,2})\s*(am|pm)?", re.IGNORECASE), None),
+    (
+        re.compile(
+            r"every\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)"
+            r"\s+at\s+(\d{1,2})\s*(am|pm)?",
+            re.IGNORECASE,
+        ),
+        None,
+    ),
+    (
+        re.compile(r"every\s+month\s+on\s+the\s+(\d{1,2})(st|nd|rd|th)?", re.IGNORECASE),
+        lambda m: f"0 0 {m.group(1)} * *",
+    ),
+    (re.compile(r"every\s+weekday\s+at\s+(\d{1,2})\s*(am|pm)?", re.IGNORECASE), None),
 ]
 
 
@@ -97,7 +104,9 @@ def parse_natural_language(expression: str) -> str | None:
         hour = _parse_hour(weekday_match.group(1), weekday_match.group(2))
         return f"0 {hour} * * 1-5"
 
-    cron_match = re.match(r"^([*\d/,\-]+\s+[*\d/,\-]+\s+[*\d/,\-]+\s+[*\d/,\-]+\s+[*\d/,\-]+)$", text)
+    cron_match = re.match(
+        r"^([*\d/,\-]+\s+[*\d/,\-]+\s+[*\d/,\-]+\s+[*\d/,\-]+\s+[*\d/,\-]+)$", text
+    )
     if cron_match:
         return cron_match.group(1)
 
@@ -113,7 +122,9 @@ class SchedulerTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Manage scheduled tasks with natural language ('every day at 9am') or cron expressions."
+        return (
+            "Manage scheduled tasks with natural language ('every day at 9am') or cron expressions."
+        )
 
     @property
     def category(self) -> str:

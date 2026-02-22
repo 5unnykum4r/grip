@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import typer
 from loguru import logger
@@ -20,14 +21,12 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
-from rich.columns import Columns
-from rich.text import Text
 
 from grip.config import GripConfig, load_config
 from grip.engines.factory import create_engine
 from grip.engines.types import AgentRunResult, EngineProtocol
 from grip.memory import MemoryManager
-from grip.providers.registry import ProviderRegistry, PROVIDERS
+from grip.providers.registry import PROVIDERS, ProviderRegistry
 from grip.session import SessionManager
 from grip.workspace import WorkspaceManager
 
@@ -67,9 +66,7 @@ def _build_completer() -> Any:
     class SlashCompleter(Completer):
         """Autocomplete slash commands with descriptions in the dropdown."""
 
-        def get_completions(
-            self, document: Document, complete_event: Any
-        ) -> Iterable[Completion]:
+        def get_completions(self, document: Document, complete_event: Any) -> Iterable[Completion]:
             text = document.text_before_cursor.lstrip()
 
             if not text.startswith("/"):
@@ -290,7 +287,9 @@ def _print_status(
         "",
         f"  [dim]Memory   :[/dim]  [white]{mem_lines} facts[/white]",
     ]
-    console.print(Panel("\n".join(info_lines), title="[bold]Status[/bold]", expand=False, border_style="dim"))
+    console.print(
+        Panel("\n".join(info_lines), title="[bold]Status[/bold]", expand=False, border_style="dim")
+    )
 
 
 def _print_doctor(
@@ -363,7 +362,7 @@ def _print_model_info(model: str | None, config: GripConfig) -> None:
     # Show other available providers for switching
     provider_names = [s.display_name for s in PROVIDERS[:9]]
     lines.append("")
-    lines.append(f"  [dim]Switch with:[/dim]  /model [cyan]provider/model-name[/cyan]")
+    lines.append("  [dim]Switch with:[/dim]  /model [cyan]provider/model-name[/cyan]")
     lines.append(f"  [dim]Providers  :[/dim]  {', '.join(provider_names[:5])}, ...")
 
     console.print(
@@ -387,8 +386,8 @@ async def _one_shot(
 async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bool) -> None:
     """Run an interactive chat session with slash-command autocomplete and enhanced UI."""
     from prompt_toolkit import PromptSession
-    from prompt_toolkit.history import FileHistory
     from prompt_toolkit.formatted_text import HTML
+    from prompt_toolkit.history import FileHistory
 
     engine, session_mgr, memory_mgr = _build_engine(config)
     session_key = _SESSION_KEY

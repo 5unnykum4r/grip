@@ -17,6 +17,7 @@ from grip.engines.sdk_hooks import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def workspace_root(tmp_path: Path) -> Path:
     return tmp_path / "workspace"
@@ -39,6 +40,7 @@ def memory_mgr():
 # ===================================================================
 # PreToolUse hook — dangerous shell command blocking
 # ===================================================================
+
 
 class TestPreToolUseShellBlocking:
     def test_blocks_rm_rf_root(self, workspace_root):
@@ -125,6 +127,7 @@ class TestPreToolUseShellBlocking:
 # PreToolUse hook — file access trust enforcement
 # ===================================================================
 
+
 class TestPreToolUseTrustEnforcement:
     def test_allows_file_in_trusted_dir(self, workspace_root, trust_mgr):
         trust_mgr.is_trusted.return_value = True
@@ -183,6 +186,7 @@ class TestPreToolUseTrustEnforcement:
 # PostToolUse hook
 # ===================================================================
 
+
 class TestPostToolUseHook:
     def test_returns_callable(self):
         hook = build_post_tool_use_hook()
@@ -200,6 +204,7 @@ class TestPostToolUseHook:
 # ===================================================================
 # Stop hook
 # ===================================================================
+
 
 class TestStopHook:
     def test_saves_summary_to_history(self, memory_mgr):

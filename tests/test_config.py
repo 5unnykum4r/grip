@@ -54,7 +54,10 @@ def test_agent_profiles_in_config():
         agents={
             "defaults": {},
             "profiles": {
-                "researcher": {"model": "openai/gpt-4o", "tools_allowed": ["web_search", "web_fetch"]},
+                "researcher": {
+                    "model": "openai/gpt-4o",
+                    "tools_allowed": ["web_search", "web_fetch"],
+                },
             },
         }
     )

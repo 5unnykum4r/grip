@@ -130,18 +130,14 @@ def test_find_trust_target_outside_home(tmp_path: Path, monkeypatch):
 
 def test_check_and_prompt_trusted(trust_mgr: TrustManager, workspace: Path):
     """check_and_prompt returns True immediately for trusted paths."""
-    result = asyncio.run(
-        trust_mgr.check_and_prompt(workspace / "file.txt", workspace)
-    )
+    result = asyncio.run(trust_mgr.check_and_prompt(workspace / "file.txt", workspace))
     assert result is True
 
 
 def test_check_and_prompt_no_callback(trust_mgr: TrustManager, workspace: Path, tmp_path: Path):
     """Without a prompt callback, untrusted paths are denied."""
     outside = tmp_path / "outside" / "file.txt"
-    result = asyncio.run(
-        trust_mgr.check_and_prompt(outside, workspace)
-    )
+    result = asyncio.run(trust_mgr.check_and_prompt(outside, workspace))
     assert result is False
 
 
@@ -154,9 +150,7 @@ def test_check_and_prompt_granted(trust_mgr: TrustManager, workspace: Path, tmp_
         return True
 
     trust_mgr.set_prompt(_always_grant)
-    result = asyncio.run(
-        trust_mgr.check_and_prompt(outside / "file.txt", workspace)
-    )
+    result = asyncio.run(trust_mgr.check_and_prompt(outside / "file.txt", workspace))
     assert result is True
     # Should now be persistently trusted
     assert trust_mgr.is_trusted(outside / "other.txt", workspace) is True

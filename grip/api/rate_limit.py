@@ -57,7 +57,8 @@ class SlidingWindowRateLimiter:
         now = time.monotonic()
         cutoff = now - self._window
         stale_keys = [
-            key for key, timestamps in self._requests.items()
+            key
+            for key, timestamps in self._requests.items()
             if not timestamps or timestamps[-1] <= cutoff
         ]
         for key in stale_keys:

@@ -50,8 +50,7 @@ def _resolve_path(raw_path: str, ctx: ToolContext) -> Path:
         workspace_resolved = ctx.workspace_path.resolve()
         if not str(resolved).startswith(str(workspace_resolved)):
             raise ValueError(
-                f"Path '{raw_path}' resolves outside workspace. "
-                f"Workspace: {workspace_resolved}"
+                f"Path '{raw_path}' resolves outside workspace. Workspace: {workspace_resolved}"
             )
 
     return resolved
@@ -97,7 +96,9 @@ class ReadFileTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Read the contents of a file. Supports optional line offset and limit for large files."
+        return (
+            "Read the contents of a file. Supports optional line offset and limit for large files."
+        )
 
     @property
     def parameters(self) -> dict[str, Any]:

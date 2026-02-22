@@ -11,7 +11,6 @@ import pytest
 from grip.tools import create_default_registry
 from grip.tools.base import Tool, ToolContext, ToolRegistry
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -21,12 +21,15 @@ def _create_channel(name: str, config) -> BaseChannel | None:
     try:
         if name == "telegram":
             from grip.channels.telegram import TelegramChannel
+
             return TelegramChannel(config)
         elif name == "discord":
             from grip.channels.discord import DiscordChannel
+
             return DiscordChannel(config)
         elif name == "slack":
             from grip.channels.slack import SlackChannel
+
             return SlackChannel(config)
         else:
             logger.warning("Unknown channel type: {}", name)

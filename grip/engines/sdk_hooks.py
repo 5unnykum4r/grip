@@ -64,8 +64,7 @@ def build_pre_tool_use_hook(
                     return {
                         "decision": "block",
                         "message": (
-                            f"Directory not trusted: {resolved.parent}. "
-                            "Use /trust to allow access."
+                            f"Directory not trusted: {resolved.parent}. Use /trust to allow access."
                         ),
                     }
 
@@ -78,9 +77,7 @@ def build_post_tool_use_hook():
     """Return a PostToolUse hook that logs tool execution for observability."""
 
     def post_tool_use(tool_name: str, tool_input: dict[str, Any], tool_output: str) -> None:
-        logger.debug(
-            "SDK tool executed: {} -> {} chars output", tool_name, len(tool_output)
-        )
+        logger.debug("SDK tool executed: {} -> {} chars output", tool_name, len(tool_output))
 
     return post_tool_use
 
@@ -94,9 +91,7 @@ def build_stop_hook(memory_mgr: MemoryManager | None):
 
     def stop_hook(conversation_summary: str) -> None:
         if memory_mgr and conversation_summary:
-            memory_mgr.append_history(
-                f"[Session summary] {conversation_summary[:500]}"
-            )
+            memory_mgr.append_history(f"[Session summary] {conversation_summary[:500]}")
             logger.debug("Stop hook: saved conversation summary to history")
 
     return stop_hook

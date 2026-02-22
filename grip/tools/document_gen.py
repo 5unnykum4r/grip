@@ -13,8 +13,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 from grip.tools.base import Tool, ToolContext
 
 _TEMPLATES: dict[str, str] = {
@@ -131,7 +129,9 @@ class DocumentGenTool(Tool):
 
     @property
     def description(self) -> str:
-        return "Generate documents from templates (report, readme, changelog, meeting_notes, custom)."
+        return (
+            "Generate documents from templates (report, readme, changelog, meeting_notes, custom)."
+        )
 
     @property
     def category(self) -> str:
@@ -179,10 +179,8 @@ class DocumentGenTool(Tool):
 
         if output_format == "html":
             final_output = _markdown_to_html(markdown_output)
-            ext = ".html"
         else:
             final_output = markdown_output
-            ext = ".md"
 
         if output_file:
             out_path = Path(output_file)

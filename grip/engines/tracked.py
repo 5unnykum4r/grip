@@ -31,9 +31,7 @@ class TrackedEngine(EngineProtocol):
         model: str | None = None,
     ) -> AgentRunResult:
         self._tracker.check_limit()
-        result = await self._inner.run(
-            user_message, session_key=session_key, model=model
-        )
+        result = await self._inner.run(user_message, session_key=session_key, model=model)
         self._tracker.record(result.prompt_tokens, result.completion_tokens)
         return result
 

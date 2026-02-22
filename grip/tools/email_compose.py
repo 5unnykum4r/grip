@@ -8,10 +8,7 @@ workspace ``drafts/`` directory as ``.md`` files.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
-
-from loguru import logger
 
 from grip.tools.base import Tool, ToolContext
 
@@ -153,7 +150,11 @@ class EmailComposeTool(Tool):
         drafts_dir = ctx.workspace_path / "drafts"
         drafts_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-        safe_subject = "".join(c if c.isalnum() or c in " -_" else "" for c in subject)[:50].strip().replace(" ", "_")
+        safe_subject = (
+            "".join(c if c.isalnum() or c in " -_" else "" for c in subject)[:50]
+            .strip()
+            .replace(" ", "_")
+        )
         filename = f"{timestamp}_{safe_subject}.md"
         draft_path = drafts_dir / filename
         draft_path.write_text(draft, encoding="utf-8")

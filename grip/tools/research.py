@@ -112,9 +112,16 @@ async def _fetch_url_text(url: str) -> str:
 
 
 _SOURCE_PRIORITY = {
-    "docs.": 5, "github.com": 4, "developer.": 4, "api.": 4,
-    "stackoverflow.com": 3, "mozilla.org": 4, ".gov": 4,
-    "medium.com": 2, "dev.to": 2, "reddit.com": 2,
+    "docs.": 5,
+    "github.com": 4,
+    "developer.": 4,
+    "api.": 4,
+    "stackoverflow.com": 3,
+    "mozilla.org": 4,
+    ".gov": 4,
+    "medium.com": 2,
+    "dev.to": 2,
+    "reddit.com": 2,
 }
 
 
@@ -155,7 +162,7 @@ def _build_cited_summary(topic: str, sources: list[dict[str, str]], contents: li
     lines: list[str] = [f"# Research: {topic}\n"]
 
     lines.append("## Key Findings\n")
-    for i, (source, content) in enumerate(zip(sources, contents), 1):
+    for i, (source, content) in enumerate(zip(sources, contents, strict=False), 1):
         title = source.get("title", source.get("url", "Source"))
         snippet = source.get("snippet", "")
         _, quality_label = _score_source_quality(source.get("url", ""))
@@ -250,11 +257,13 @@ class WebResearchTool(Tool):
                     data = resp.json()
                     for item in data.get("RelatedTopics", []):
                         if "FirstURL" in item:
-                            all_results.append({
-                                "url": item["FirstURL"],
-                                "title": item.get("Text", "")[:100],
-                                "snippet": item.get("Text", "")[:200],
-                            })
+                            all_results.append(
+                                {
+                                    "url": item["FirstURL"],
+                                    "title": item.get("Text", "")[:100],
+                                    "snippet": item.get("Text", "")[:200],
+                                }
+                            )
                 except Exception as exc:
                     logger.debug("Search query '{}' failed: {}", query, exc)
 

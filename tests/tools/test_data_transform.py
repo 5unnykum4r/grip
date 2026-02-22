@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import csv
 import json
-from pathlib import Path
 
 import pytest
 
@@ -99,10 +97,13 @@ class TestDataTransformTool:
         json_file = ctx.workspace_path / "data.json"
 
         tool = DataTransformTool()
-        result = await tool.execute({
-            "input_file": "data.csv",
-            "output_file": "data.json",
-        }, ctx)
+        await tool.execute(
+            {
+                "input_file": "data.csv",
+                "output_file": "data.json",
+            },
+            ctx,
+        )
 
         assert json_file.exists()
         data = json.loads(json_file.read_text(encoding="utf-8"))
@@ -115,12 +116,18 @@ class TestDataTransformTool:
         json_file.write_text(json.dumps(SAMPLE_DATA), encoding="utf-8")
 
         tool = DataTransformTool()
-        result = await tool.execute({
-            "input_file": "data.json",
-            "operations": [
-                {"type": "filter", "filter": {"column": "dept", "op": "==", "value": "Engineering"}},
-            ],
-        }, ctx)
+        result = await tool.execute(
+            {
+                "input_file": "data.json",
+                "operations": [
+                    {
+                        "type": "filter",
+                        "filter": {"column": "dept", "op": "==", "value": "Engineering"},
+                    },
+                ],
+            },
+            ctx,
+        )
         assert "Carol" in result
         assert "Bob" not in result
 

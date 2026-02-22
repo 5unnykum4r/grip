@@ -16,7 +16,9 @@ from grip.tools.spawn import (
 @pytest.fixture
 def manager() -> SubagentManager:
     mgr = SubagentManager()
-    info = SubagentInfo(id="sub_test123", task_description="Test task", status="completed", result="Done!")
+    info = SubagentInfo(
+        id="sub_test123", task_description="Test task", status="completed", result="Done!"
+    )
     mgr._agents["sub_test123"] = info
     running = SubagentInfo(id="sub_running1", task_description="Running task", status="running")
     mgr._agents["sub_running1"] = running

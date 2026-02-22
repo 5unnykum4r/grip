@@ -87,9 +87,7 @@ class SlackChannel(BaseChannel):
                     user_id = event.get("user", "")
                     if not channel_ref.is_allowed(user_id):
                         logger.warning("Slack: blocked message from non-allowed user {}", user_id)
-                        await client.send_socket_mode_response(
-                            {"envelope_id": req.envelope_id}
-                        )
+                        await client.send_socket_mode_response({"envelope_id": req.envelope_id})
                         return
 
                     text = event.get("text", "").strip()
@@ -113,9 +111,7 @@ class SlackChannel(BaseChannel):
                                 },
                             )
                             await bus.push_inbound(cmd_msg)
-                            await client.send_socket_mode_response(
-                                {"envelope_id": req.envelope_id}
-                            )
+                            await client.send_socket_mode_response({"envelope_id": req.envelope_id})
                             return
 
                     msg = InboundMessage(
@@ -130,14 +126,10 @@ class SlackChannel(BaseChannel):
                     )
                     await bus.push_inbound(msg)
 
-                await client.send_socket_mode_response(
-                    {"envelope_id": req.envelope_id}
-                )
+                await client.send_socket_mode_response({"envelope_id": req.envelope_id})
 
         self._socket_client.socket_mode_request_listeners.append(on_event)
-        self._task = asyncio.create_task(
-            self._socket_client.connect(), name="slack-socket-mode"
-        )
+        self._task = asyncio.create_task(self._socket_client.connect(), name="slack-socket-mode")
         logger.info("Slack channel started (Socket Mode)")
 
     async def stop(self) -> None:

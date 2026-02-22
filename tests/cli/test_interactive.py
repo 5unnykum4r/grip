@@ -7,21 +7,19 @@ dynamic prompt.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from grip.cli.agent_cmd import (
     _COMMANDS,
     _build_completer,
-    _short_model_name,
     _resolve_provider_display,
+    _short_model_name,
 )
-
 
 # ---------------------------------------------------------------------------
 # SlashCompleter
 # ---------------------------------------------------------------------------
+
 
 class TestSlashCompleter:
     """Verify autocomplete returns matching commands with descriptions."""
@@ -90,6 +88,7 @@ class TestSlashCompleter:
 # _short_model_name
 # ---------------------------------------------------------------------------
 
+
 class TestShortModelName:
     def test_triple_slash_path(self):
         assert _short_model_name("openrouter/anthropic/claude-sonnet-4") == "claude-sonnet-4"
@@ -108,8 +107,11 @@ class TestShortModelName:
 # _resolve_provider_display
 # ---------------------------------------------------------------------------
 
+
 class TestResolveProviderDisplay:
-    def _make_config(self, model: str = "openrouter/anthropic/claude-sonnet-4", provider: str = "") -> MagicMock:
+    def _make_config(
+        self, model: str = "openrouter/anthropic/claude-sonnet-4", provider: str = ""
+    ) -> MagicMock:
         config = MagicMock()
         config.agents.defaults.model = model
         config.agents.defaults.provider = provider
@@ -143,9 +145,10 @@ class TestResolveProviderDisplay:
 # _COMMANDS registry
 # ---------------------------------------------------------------------------
 
+
 class TestCommandsRegistry:
     def test_all_commands_have_description_and_category(self):
-        for cmd, (desc, cat) in _COMMANDS.items():
+        for cmd, (desc, _cat) in _COMMANDS.items():
             assert cmd.startswith("/"), f"Command {cmd} doesn't start with /"
             assert len(desc) > 0, f"Command {cmd} has empty description"
 

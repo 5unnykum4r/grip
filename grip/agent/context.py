@@ -14,12 +14,12 @@ from __future__ import annotations
 import platform
 import re
 from datetime import UTC, datetime
+
 from loguru import logger
 
 from grip import __version__
 from grip.providers.types import LLMMessage
 from grip.workspace.manager import WorkspaceManager
-
 
 # Patterns used by _detect_tone_hint() to classify the user's emotional state.
 _ERROR_PATTERNS = re.compile(
@@ -44,7 +44,10 @@ def _detect_tone_hint(user_message: str) -> str:
     if not user_message:
         return ""
 
-    is_caps = sum(1 for c in user_message if c.isupper()) > len(user_message) * 0.6 and len(user_message) > 10
+    is_caps = (
+        sum(1 for c in user_message if c.isupper()) > len(user_message) * 0.6
+        and len(user_message) > 10
+    )
     frustrated = bool(_FRUSTRATION_PATTERNS.search(user_message)) or is_caps
     has_error = bool(_ERROR_PATTERNS.search(user_message))
     brainstorming = bool(_BRAINSTORM_PATTERNS.search(user_message))
@@ -170,9 +173,7 @@ class ContextBuilder:
         for s in skills:
             desc = f": {s.description}" if s.description else ""
             lines.append(f"- **{s.name}**{desc}")
-        lines.append(
-            "\nUse the read_file tool to load a skill's full instructions when needed."
-        )
+        lines.append("\nUse the read_file tool to load a skill's full instructions when needed.")
         return "\n".join(lines)
 
     @staticmethod

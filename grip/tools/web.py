@@ -161,9 +161,7 @@ class WebSearchTool(Tool):
         """Extract search results from DuckDuckGo HTML response."""
         results: list[tuple[str, str, str]] = []
         # Match result links and snippets from the HTML page
-        link_pattern = re.compile(
-            r'class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>', re.DOTALL
-        )
+        link_pattern = re.compile(r'class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>', re.DOTALL)
         snippet_pattern = re.compile(
             r'class="result__snippet"[^>]*>(.*?)</(?:td|div|span)>', re.DOTALL
         )

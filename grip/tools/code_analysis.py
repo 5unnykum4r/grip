@@ -9,11 +9,10 @@ Uses Python's built-in ``ast`` module (zero external dependencies) to compute:
 from __future__ import annotations
 
 import ast
+import contextlib
 import sys
 from pathlib import Path
 from typing import Any
-
-from loguru import logger
 
 from grip.tools.base import Tool, ToolContext
 
@@ -30,13 +29,45 @@ def _get_stdlib_modules() -> frozenset[str]:
     try:
         _STDLIB_TOP_LEVEL = frozenset(sys.stdlib_module_names)
     except AttributeError:
-        _STDLIB_TOP_LEVEL = frozenset({
-            "os", "sys", "re", "json", "math", "pathlib", "typing", "collections",
-            "functools", "itertools", "io", "datetime", "time", "logging", "unittest",
-            "ast", "abc", "dataclasses", "contextlib", "subprocess", "threading",
-            "asyncio", "http", "urllib", "socket", "hashlib", "secrets", "uuid",
-            "csv", "xml", "email", "html", "textwrap", "shutil", "tempfile",
-        })
+        _STDLIB_TOP_LEVEL = frozenset(
+            {
+                "os",
+                "sys",
+                "re",
+                "json",
+                "math",
+                "pathlib",
+                "typing",
+                "collections",
+                "functools",
+                "itertools",
+                "io",
+                "datetime",
+                "time",
+                "logging",
+                "unittest",
+                "ast",
+                "abc",
+                "dataclasses",
+                "contextlib",
+                "subprocess",
+                "threading",
+                "asyncio",
+                "http",
+                "urllib",
+                "socket",
+                "hashlib",
+                "secrets",
+                "uuid",
+                "csv",
+                "xml",
+                "email",
+                "html",
+                "textwrap",
+                "shutil",
+                "tempfile",
+            }
+        )
     return _STDLIB_TOP_LEVEL
 
 
@@ -48,11 +79,9 @@ def _cyclomatic_complexity(node: ast.AST) -> int:
     """
     complexity = 1
     for child in ast.walk(node):
-        if isinstance(child, (ast.If, ast.IfExp)):
-            complexity += 1
-        elif isinstance(child, (ast.For, ast.While, ast.AsyncFor)):
-            complexity += 1
-        elif isinstance(child, ast.ExceptHandler):
+        if isinstance(
+            child, (ast.If, ast.IfExp, ast.For, ast.While, ast.AsyncFor, ast.ExceptHandler)
+        ):
             complexity += 1
         elif isinstance(child, ast.BoolOp):
             complexity += len(child.values) - 1
@@ -80,12 +109,14 @@ def _analyze_complexity(tree: ast.AST, source_lines: int) -> dict[str, Any]:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             cc = _cyclomatic_complexity(node)
             end_line = getattr(node, "end_lineno", node.lineno)
-            functions.append({
-                "name": node.name,
-                "line": node.lineno,
-                "complexity": cc,
-                "lines": end_line - node.lineno + 1,
-            })
+            functions.append(
+                {
+                    "name": node.name,
+                    "line": node.lineno,
+                    "complexity": cc,
+                    "lines": end_line - node.lineno + 1,
+                }
+            )
 
     functions.sort(key=lambda f: f["complexity"], reverse=True)
     total_cc = sum(f["complexity"] for f in functions)
@@ -130,7 +161,9 @@ def _analyze_dependencies(tree: ast.AST) -> dict[str, list[str]]:
 def _analyze_structure(tree: ast.AST, source_lines: int) -> dict[str, Any]:
     """Count classes, functions, and compute size/nesting metrics."""
     classes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
-    functions = [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    functions = [
+        n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
 
     func_sizes = []
     for f in functions:
@@ -215,7 +248,7 @@ class CodeAnalysisTool(Tool):
         analysis_type = params.get("analysis_type", "complexity")
 
         if analysis_type not in ("complexity", "dependencies", "structure"):
-            return f"Error: analysis_type must be one of: complexity, dependencies, structure"
+            return "Error: analysis_type must be one of: complexity, dependencies, structure"
 
         target = Path(raw_path)
         if not target.is_absolute():
@@ -254,10 +287,8 @@ class CodeAnalysisTool(Tool):
                 continue
 
             display_path = str(file_path)
-            try:
+            with contextlib.suppress(ValueError):
                 display_path = str(file_path.relative_to(ctx.workspace_path))
-            except ValueError:
-                pass
 
             if analysis_type == "complexity":
                 data = _analyze_complexity(tree, source_lines)

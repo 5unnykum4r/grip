@@ -242,7 +242,7 @@ class MemoryManager:
                 if union > 0 and intersection / union >= similarity_threshold:
                     keep[j] = False
 
-        deduplicated = [c for c, k in zip(chunks, keep) if k]
+        deduplicated = [c for c, k in zip(chunks, keep, strict=True) if k]
         removed = len(chunks) - len(deduplicated)
         if removed > 0:
             self.write_memory("\n".join(deduplicated) + "\n")
@@ -330,7 +330,9 @@ class MemoryManager:
         facts = response.content or ""
 
         if facts and "no new facts" not in facts.lower():
-            self.append_to_memory(f"\n### Consolidated {datetime.now(UTC).strftime('%Y-%m-%d')}\n{facts}\n")
+            self.append_to_memory(
+                f"\n### Consolidated {datetime.now(UTC).strftime('%Y-%m-%d')}\n{facts}\n"
+            )
             logger.info("Appended consolidated facts to MEMORY.md")
 
         summary = self._build_history_summary(old_messages)
@@ -372,17 +374,91 @@ class MemoryManager:
 
 
 # Stopwords filtered out during tokenization to improve TF-IDF relevance
-_STOPWORDS: frozenset[str] = frozenset({
-    "a", "an", "the", "is", "it", "in", "on", "at", "to", "of", "for",
-    "and", "or", "but", "not", "with", "from", "by", "as", "was", "were",
-    "be", "been", "has", "have", "had", "do", "does", "did", "will",
-    "would", "could", "should", "can", "may", "this", "that", "these",
-    "those", "i", "you", "he", "she", "we", "they", "me", "him", "her",
-    "us", "them", "my", "your", "his", "its", "our", "their", "what",
-    "which", "who", "when", "where", "how", "all", "each", "every",
-    "some", "any", "no", "just", "about", "up", "out", "so", "if",
-    "then", "than", "too", "very", "also", "here", "there",
-})
+_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "is",
+        "it",
+        "in",
+        "on",
+        "at",
+        "to",
+        "of",
+        "for",
+        "and",
+        "or",
+        "but",
+        "not",
+        "with",
+        "from",
+        "by",
+        "as",
+        "was",
+        "were",
+        "be",
+        "been",
+        "has",
+        "have",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "can",
+        "may",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "we",
+        "they",
+        "me",
+        "him",
+        "her",
+        "us",
+        "them",
+        "my",
+        "your",
+        "his",
+        "its",
+        "our",
+        "their",
+        "what",
+        "which",
+        "who",
+        "when",
+        "where",
+        "how",
+        "all",
+        "each",
+        "every",
+        "some",
+        "any",
+        "no",
+        "just",
+        "about",
+        "up",
+        "out",
+        "so",
+        "if",
+        "then",
+        "than",
+        "too",
+        "very",
+        "also",
+        "here",
+        "there",
+    }
+)
 
 _WORD_RE = re.compile(r"[a-z0-9_]+")
 _TIMESTAMP_RE = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC\]")
@@ -391,8 +467,7 @@ _TIMESTAMP_RE = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC\]")
 def _tokenize(text: str) -> list[str]:
     """Split text into lowercase tokens, filtering stopwords and short tokens."""
     return [
-        word for word in _WORD_RE.findall(text.lower())
-        if len(word) > 2 and word not in _STOPWORDS
+        word for word in _WORD_RE.findall(text.lower()) if len(word) > 2 and word not in _STOPWORDS
     ]
 
 

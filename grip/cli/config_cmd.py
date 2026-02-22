@@ -26,15 +26,15 @@ config_app = typer.Typer(no_args_is_help=True)
 def _mask_secrets(obj: Any) -> Any:
     """Recursively mask strings that look like API keys or tokens."""
     if isinstance(obj, str):
-        if len(obj) > 8 and any(
-            kw in obj.lower() for kw in ("sk-", "key-", "token", "secret")
-        ):
+        if len(obj) > 8 and any(kw in obj.lower() for kw in ("sk-", "key-", "token", "secret")):
             return obj[:4] + "***" + obj[-4:]
         if len(obj) > 20 and re.match(r"^[A-Za-z0-9_\-]+$", obj):
             return obj[:4] + "***" + obj[-4:]
         return obj
     elif isinstance(obj, dict):
-        return {k: _mask_secrets(v) if _is_secret_key(k) else _mask_secrets(v) for k, v in obj.items()}
+        return {
+            k: _mask_secrets(v) if _is_secret_key(k) else _mask_secrets(v) for k, v in obj.items()
+        }
     elif isinstance(obj, list):
         return [_mask_secrets(item) for item in obj]
     return obj

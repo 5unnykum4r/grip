@@ -12,8 +12,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 from grip.tools.base import Tool, ToolContext
 
 _SUPPORTED_EXTENSIONS = {".csv", ".json", ".yaml", ".yml"}
@@ -37,8 +35,10 @@ def _read_data(file_path: Path) -> list[dict[str, Any]]:
     elif ext in (".yaml", ".yml"):
         try:
             import yaml
-        except ImportError:
-            raise ValueError("PyYAML is required for YAML files. Install with: pip install pyyaml")
+        except ImportError as err:
+            raise ValueError(
+                "PyYAML is required for YAML files. Install with: pip install pyyaml"
+            ) from err
         data = yaml.safe_load(content)
         if isinstance(data, list):
             return data
@@ -67,8 +67,8 @@ def _write_data(data: list[dict[str, Any]], file_path: Path) -> str:
     elif ext in (".yaml", ".yml"):
         try:
             import yaml
-        except ImportError:
-            raise ValueError("PyYAML is required for YAML output.")
+        except ImportError as err:
+            raise ValueError("PyYAML is required for YAML output.") from err
         file_path.write_text(yaml.dump(data, default_flow_style=False), encoding="utf-8")
     else:
         raise ValueError(f"Unsupported output format: {ext}")
@@ -109,9 +109,8 @@ def _apply_filter(data: list[dict[str, Any]], filter_spec: dict[str, Any]) -> li
             elif op == "<=":
                 if float(cell) <= float(value):
                     result.append(row)
-            elif op == "contains":
-                if str(value).lower() in str(cell).lower():
-                    result.append(row)
+            elif op == "contains" and str(value).lower() in str(cell).lower():
+                result.append(row)
         except (ValueError, TypeError):
             continue
     return result

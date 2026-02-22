@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from grip.tools.base import ToolContext
@@ -91,12 +89,15 @@ class TestSchedulerTool:
     @pytest.mark.asyncio
     async def test_create_action(self, ctx):
         tool = SchedulerTool()
-        result = await tool.execute({
-            "action": "create",
-            "schedule": "every 5 minutes",
-            "task_name": "Health check",
-            "command": "curl http://localhost/health",
-        }, ctx)
+        result = await tool.execute(
+            {
+                "action": "create",
+                "schedule": "every 5 minutes",
+                "task_name": "Health check",
+                "command": "curl http://localhost/health",
+            },
+            ctx,
+        )
         assert "Scheduled task created" in result
         assert "*/5 * * * *" in result
 
@@ -112,30 +113,39 @@ class TestSchedulerTool:
     @pytest.mark.asyncio
     async def test_list_after_create(self, ctx):
         tool = SchedulerTool()
-        await tool.execute({
-            "action": "create",
-            "schedule": "every hour",
-            "task_name": "Backup",
-            "command": "backup.sh",
-        }, ctx)
+        await tool.execute(
+            {
+                "action": "create",
+                "schedule": "every hour",
+                "task_name": "Backup",
+                "command": "backup.sh",
+            },
+            ctx,
+        )
         result = await tool.execute({"action": "list"}, ctx)
         assert "Backup" in result
 
     @pytest.mark.asyncio
     async def test_delete_action(self, ctx):
         tool = SchedulerTool()
-        create_result = await tool.execute({
-            "action": "create",
-            "schedule": "every day at 9am",
-            "task_name": "Report",
-            "command": "generate_report.py",
-        }, ctx)
+        create_result = await tool.execute(
+            {
+                "action": "create",
+                "schedule": "every day at 9am",
+                "task_name": "Report",
+                "command": "generate_report.py",
+            },
+            ctx,
+        )
         task_id = create_result.split("ID: ")[1].split("\n")[0].strip()
 
-        delete_result = await tool.execute({
-            "action": "delete",
-            "task_id": task_id,
-        }, ctx)
+        delete_result = await tool.execute(
+            {
+                "action": "delete",
+                "task_id": task_id,
+            },
+            ctx,
+        )
         assert "Deleted" in delete_result
 
         cron_files = list((ctx.workspace_path / "cron").glob("*.json"))
@@ -144,18 +154,24 @@ class TestSchedulerTool:
     @pytest.mark.asyncio
     async def test_invalid_schedule_returns_error(self, ctx):
         tool = SchedulerTool()
-        result = await tool.execute({
-            "action": "create",
-            "schedule": "whenever I feel like it",
-            "task_name": "Random",
-        }, ctx)
+        result = await tool.execute(
+            {
+                "action": "create",
+                "schedule": "whenever I feel like it",
+                "task_name": "Random",
+            },
+            ctx,
+        )
         assert "Error" in result
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent_returns_error(self, ctx):
         tool = SchedulerTool()
-        result = await tool.execute({
-            "action": "delete",
-            "task_id": "nonexistent",
-        }, ctx)
+        result = await tool.execute(
+            {
+                "action": "delete",
+                "task_id": "nonexistent",
+            },
+            ctx,
+        )
         assert "Error" in result

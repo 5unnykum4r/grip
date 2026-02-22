@@ -83,7 +83,11 @@ def workflow_show(
             step = next(s for s in wf.steps if s.name == step_name)
             deps = f" ← [{', '.join(step.depends_on)}]" if step.depends_on else ""
             console.print(f"    [{step.profile}] {step.name}{deps}")
-            console.print(f"      [dim]{step.prompt[:80]}...[/dim]" if len(step.prompt) > 80 else f"      [dim]{step.prompt}[/dim]")
+            console.print(
+                f"      [dim]{step.prompt[:80]}...[/dim]"
+                if len(step.prompt) > 80
+                else f"      [dim]{step.prompt}[/dim]"
+            )
 
 
 @workflow_app.command(name="run")
@@ -108,7 +112,9 @@ def workflow_run(
     console.print(f"\n[bold]Result:[/bold] {result.status} ({result.total_duration_seconds:.1f}s)")
     for step_name, step_result in result.step_results.items():
         icon = "✓" if step_result.status.value == "completed" else "✗"
-        console.print(f"  {icon} {step_name}: {step_result.status.value} ({step_result.duration_seconds:.1f}s)")
+        console.print(
+            f"  {icon} {step_name}: {step_result.status.value} ({step_result.duration_seconds:.1f}s)"
+        )
         if step_result.error:
             console.print(f"    [red]{step_result.error}[/red]")
 
@@ -133,7 +139,9 @@ async def _run_workflow(config, wf):
     memory_mgr = MemoryManager(ws.root)
 
     loop = AgentLoop(
-        config, provider, ws,
+        config,
+        provider,
+        ws,
         tool_registry=registry,
         session_manager=session_mgr,
         memory_manager=memory_mgr,

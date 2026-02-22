@@ -183,7 +183,8 @@ class TelegramChannel(BaseChannel):
             if ids is None:
                 return
             await update.effective_chat.send_message(
-                _build_help_text(), parse_mode="HTML",
+                _build_help_text(),
+                parse_mode="HTML",
             )
 
         # ── /new — route through bus ──
@@ -481,7 +482,9 @@ class TelegramChannel(BaseChannel):
                         caption=html_caption or None,
                         parse_mode="HTML" if html_caption else None,
                     )
-            logger.info("Telegram: sent {} to chat {}", "photo" if is_image else "document", chat_id)
+            logger.info(
+                "Telegram: sent {} to chat {}", "photo" if is_image else "document", chat_id
+            )
         except Exception as exc:
             logger.error("Telegram: failed to send file {}: {}", file_path, exc)
             # Fallback: try without caption parsing

@@ -17,7 +17,6 @@ import pytest
 from grip.agent.context import ContextBuilder, _detect_tone_hint
 from grip.workspace.manager import WorkspaceManager
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -75,7 +74,9 @@ def builder(workspace: WorkspaceManager) -> ContextBuilder:
 class TestToolsMdExcluded:
     """TOOLS.md content must NOT appear in the system prompt."""
 
-    def test_no_tools_md_content_in_prompt(self, workspace: WorkspaceManager, builder: ContextBuilder):
+    def test_no_tools_md_content_in_prompt(
+        self, workspace: WorkspaceManager, builder: ContextBuilder
+    ):
         (workspace.root / "TOOLS.md").write_text(
             "# grip — Available Tools & Skills\n\n"
             "## Tool Usage Guidelines\n\n"
@@ -212,7 +213,9 @@ class TestToneHints:
         assert "brainstorm" in result.lower() or "creative" in result.lower()
 
     def test_tone_included_in_prompt(self, builder: ContextBuilder):
-        msg = builder.build_system_message(user_message="This traceback error is driving me crazy wtf")
+        msg = builder.build_system_message(
+            user_message="This traceback error is driving me crazy wtf"
+        )
         prompt = msg.content
 
         assert "## Tone Adaptation" in prompt

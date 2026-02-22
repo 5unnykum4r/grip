@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import ast
 
 import pytest
 
@@ -16,8 +16,6 @@ from grip.tools.code_analysis import (
     _max_nesting_depth,
     create_code_analysis_tools,
 )
-
-import ast
 
 
 @pytest.fixture
@@ -141,17 +139,13 @@ class TestCodeAnalysisTool:
         py_file.write_text(SIMPLE_FUNCTION, encoding="utf-8")
 
         tool = CodeAnalysisTool()
-        result = await tool.execute(
-            {"path": "sample.py", "analysis_type": "complexity"}, ctx
-        )
+        result = await tool.execute({"path": "sample.py", "analysis_type": "complexity"}, ctx)
         assert "greet" in result
 
     @pytest.mark.asyncio
     async def test_rejects_nonexistent_path(self, ctx):
         tool = CodeAnalysisTool()
-        result = await tool.execute(
-            {"path": "nonexistent.py", "analysis_type": "complexity"}, ctx
-        )
+        result = await tool.execute({"path": "nonexistent.py", "analysis_type": "complexity"}, ctx)
         assert "Error" in result
 
     @pytest.mark.asyncio
@@ -160,9 +154,7 @@ class TestCodeAnalysisTool:
         txt_file.write_text("hello", encoding="utf-8")
 
         tool = CodeAnalysisTool()
-        result = await tool.execute(
-            {"path": "readme.txt", "analysis_type": "complexity"}, ctx
-        )
+        result = await tool.execute({"path": "readme.txt", "analysis_type": "complexity"}, ctx)
         assert "Error" in result
 
     @pytest.mark.asyncio
@@ -173,7 +165,5 @@ class TestCodeAnalysisTool:
         (pkg / "b.py").write_text("def bar(): pass\n", encoding="utf-8")
 
         tool = CodeAnalysisTool()
-        result = await tool.execute(
-            {"path": "pkg", "analysis_type": "structure"}, ctx
-        )
+        result = await tool.execute({"path": "pkg", "analysis_type": "structure"}, ctx)
         assert "Analyzed 2 Python files" in result

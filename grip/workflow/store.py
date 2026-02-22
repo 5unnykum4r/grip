@@ -46,9 +46,7 @@ class WorkflowStore:
 
     def list_workflows(self) -> list[str]:
         """Return names of all saved workflows."""
-        return sorted(
-            p.stem for p in self._dir.glob("*.json")
-        )
+        return sorted(p.stem for p in self._dir.glob("*.json"))
 
     def delete(self, name: str) -> bool:
         """Delete a workflow by name."""

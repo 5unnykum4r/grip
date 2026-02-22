@@ -79,16 +79,11 @@ class WorkflowEngine:
                 step_def = step_map[step_name]
                 step_result = result.step_results[step_name]
                 resolved_prompt = self._resolve_template(step_def.prompt, result.step_results)
-                tasks.append(
-                    self._execute_step(step_def, step_result, resolved_prompt)
-                )
+                tasks.append(self._execute_step(step_def, step_result, resolved_prompt))
 
             await asyncio.gather(*tasks)
 
-            if any(
-                result.step_results[name].status == StepStatus.FAILED
-                for name in layer_names
-            ):
+            if any(result.step_results[name].status == StepStatus.FAILED for name in layer_names):
                 logger.warning("Layer {} had failures, skipping dependent steps", layer_idx)
                 self._skip_dependents(layer_names, layers[layer_idx:], result, step_map)
                 break
@@ -171,8 +166,7 @@ class WorkflowEngine:
     ) -> None:
         """Mark steps that depend on failed steps as skipped."""
         failed_set = {
-            name for name in failed_layer
-            if result.step_results[name].status == StepStatus.FAILED
+            name for name in failed_layer if result.step_results[name].status == StepStatus.FAILED
         }
 
         for layer in remaining_layers:

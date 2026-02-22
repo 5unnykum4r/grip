@@ -38,13 +38,15 @@ class KnowledgeEntry:
     access_count: int = 0
 
 
-VALID_CATEGORIES: frozenset[str] = frozenset({
-    "user_preference",
-    "project_decision",
-    "system_behavior",
-    "learned_fact",
-    "error_pattern",
-})
+VALID_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "user_preference",
+        "project_decision",
+        "system_behavior",
+        "learned_fact",
+        "error_pattern",
+    }
+)
 
 
 def _make_id(category: str, content: str) -> str:
@@ -114,7 +116,9 @@ class KnowledgeBase:
         updates its access time and returns the existing entry.
         """
         if category not in VALID_CATEGORIES:
-            logger.warning("Unknown knowledge category '{}', defaulting to 'learned_fact'", category)
+            logger.warning(
+                "Unknown knowledge category '{}', defaulting to 'learned_fact'", category
+            )
             category = "learned_fact"
 
         entry_id = _make_id(category, content)
@@ -218,7 +222,13 @@ class KnowledgeBase:
         Truncates to max_chars to fit within context budgets.
         """
         # Prioritize user preferences, then by access count
-        priority_order = ["user_preference", "project_decision", "error_pattern", "system_behavior", "learned_fact"]
+        priority_order = [
+            "user_preference",
+            "project_decision",
+            "error_pattern",
+            "system_behavior",
+            "learned_fact",
+        ]
         sorted_entries: list[KnowledgeEntry] = []
         for cat in priority_order:
             cat_entries = self.by_category(cat)

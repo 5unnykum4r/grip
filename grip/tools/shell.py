@@ -18,14 +18,14 @@ _DENY_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     re.compile(p, re.IGNORECASE)
     for p in (
         # Destructive file operations
-        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/\s*$",    # rm -rf /
-        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/\*",       # rm -rf /*
-        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+~",          # rm -rf ~ (any variant)
-        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+\$HOME",     # rm -rf $HOME
-        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/home\b",    # rm -rf /home
-        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/etc\b",     # rm -rf /etc
-        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/var\b",     # rm -rf /var
-        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/usr\b",     # rm -rf /usr
+        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/\s*$",  # rm -rf /
+        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/\*",  # rm -rf /*
+        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+~",  # rm -rf ~ (any variant)
+        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+\$HOME",  # rm -rf $HOME
+        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/home\b",  # rm -rf /home
+        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/etc\b",  # rm -rf /etc
+        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/var\b",  # rm -rf /var
+        r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/usr\b",  # rm -rf /usr
         # Disk/device destruction
         r"mkfs\b",
         r"dd\s+if=",

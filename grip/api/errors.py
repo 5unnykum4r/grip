@@ -23,11 +23,13 @@ def register_error_handlers(app: FastAPI) -> None:
         """Return 422 with field-level errors but no internal path info."""
         sanitized_errors = []
         for error in exc.errors():
-            sanitized_errors.append({
-                "field": " -> ".join(str(loc) for loc in error.get("loc", []) if loc != "body"),
-                "message": error.get("msg", "Invalid value"),
-                "type": error.get("type", "value_error"),
-            })
+            sanitized_errors.append(
+                {
+                    "field": " -> ".join(str(loc) for loc in error.get("loc", []) if loc != "body"),
+                    "message": error.get("msg", "Invalid value"),
+                    "type": error.get("type", "value_error"),
+                }
+            )
         logger.warning(
             "Validation error on {} {}: {}",
             request.method,

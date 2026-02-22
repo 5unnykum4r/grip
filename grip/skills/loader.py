@@ -160,7 +160,7 @@ class SkillsLoader:
             return {}, text
 
         yaml_block = stripped[3:end_idx].strip()
-        remaining = stripped[end_idx + 3:].lstrip("\n")
+        remaining = stripped[end_idx + 3 :].lstrip("\n")
 
         metadata: dict[str, str] = {}
         for line in yaml_block.splitlines():
@@ -171,7 +171,7 @@ class SkillsLoader:
             if colon_pos == -1:
                 continue
             key = line[:colon_pos].strip()
-            value = line[colon_pos + 1:].strip()
+            value = line[colon_pos + 1 :].strip()
             metadata[key] = value
         return metadata, remaining
 

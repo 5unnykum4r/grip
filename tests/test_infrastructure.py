@@ -8,7 +8,6 @@ import grip
 from grip.api.rate_limit import SlidingWindowRateLimiter
 from grip.pool import get_http_pool, get_provider_pool, shutdown_pools
 
-
 # ---------------------------------------------------------------------------
 # Version consistency
 # ---------------------------------------------------------------------------

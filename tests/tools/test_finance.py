@@ -14,9 +14,7 @@ import pytest
 from grip.tools.base import ToolContext
 
 _yfinance_available = importlib.util.find_spec("yfinance") is not None
-skip_if_no_yfinance = pytest.mark.skipif(
-    not _yfinance_available, reason="yfinance not installed"
-)
+skip_if_no_yfinance = pytest.mark.skipif(not _yfinance_available, reason="yfinance not installed")
 
 
 @pytest.fixture
@@ -133,9 +131,7 @@ async def test_stock_history_invalid_period(ctx: ToolContext):
     from grip.tools.finance import StockHistoryTool
 
     with patch("grip.tools.finance._import_yfinance"):
-        result = await StockHistoryTool().execute(
-            {"symbol": "AAPL", "period": "INVALID"}, ctx
-        )
+        result = await StockHistoryTool().execute({"symbol": "AAPL", "period": "INVALID"}, ctx)
     assert "Error: Invalid period" in result
 
 

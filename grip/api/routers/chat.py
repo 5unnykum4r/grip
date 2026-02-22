@@ -131,14 +131,16 @@ async def chat_stream(
             }
             yield {
                 "event": "done",
-                "data": json.dumps({
-                    "iterations": result.iterations,
-                    "usage": {
-                        "prompt_tokens": result.prompt_tokens,
-                        "completion_tokens": result.completion_tokens,
-                    },
-                    "tool_calls_made": result.tool_calls_made,
-                }),
+                "data": json.dumps(
+                    {
+                        "iterations": result.iterations,
+                        "usage": {
+                            "prompt_tokens": result.prompt_tokens,
+                            "completion_tokens": result.completion_tokens,
+                        },
+                        "tool_calls_made": result.tool_calls_made,
+                    }
+                ),
             }
         except Exception:
             yield {

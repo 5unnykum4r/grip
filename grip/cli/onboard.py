@@ -286,7 +286,9 @@ def _auto_test_sdk_connection(api_key: str, model: str) -> bool:
                 return True
             except ImportError:
                 # SDK not installed -- verify the API key via LiteLLM instead
-                progress.update(task, description="[cyan]SDK not installed, testing key via LiteLLM...")
+                progress.update(
+                    task, description="[cyan]SDK not installed, testing key via LiteLLM..."
+                )
                 from grip.providers.litellm_provider import LiteLLMProvider
 
                 provider = LiteLLMProvider(
@@ -304,7 +306,11 @@ def _auto_test_sdk_connection(api_key: str, model: str) -> bool:
                         temperature=0.0,
                     )
                 )
-                progress.update(task, description="[green]API key verified (SDK will be used at runtime)!", completed=True)
+                progress.update(
+                    task,
+                    description="[green]API key verified (SDK will be used at runtime)!",
+                    completed=True,
+                )
                 return True
         except Exception as exc:
             progress.update(task, description="[red]Connection failed!", completed=True)

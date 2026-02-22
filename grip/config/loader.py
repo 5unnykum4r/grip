@@ -69,9 +69,7 @@ def _strip_empty_providers(data: dict) -> None:
     empty_keys = [
         name
         for name, entry in providers.items()
-        if isinstance(entry, dict)
-        and not entry.get("api_key")
-        and not entry.get("default_model")
+        if isinstance(entry, dict) and not entry.get("api_key") and not entry.get("default_model")
     ]
     for key in empty_keys:
         del providers[key]

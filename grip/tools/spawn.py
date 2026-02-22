@@ -203,7 +203,9 @@ class CheckSubagentTool(Tool):
     async def execute(self, params: dict[str, Any], ctx: ToolContext) -> str:
         info = self._manager.get(params["agent_id"])
         if not info:
-            return f"No subagent found with ID '{params['agent_id']}'. Use list_subagents to see all."
+            return (
+                f"No subagent found with ID '{params['agent_id']}'. Use list_subagents to see all."
+            )
         return (
             f"ID: {info.id}\n"
             f"Task: {info.task_description}\n"

@@ -114,9 +114,7 @@ class DiscordChannel(BaseChannel):
             )
             await bus.push_inbound(msg)
 
-        self._task = asyncio.create_task(
-            self._client.start(token), name="discord-bot"
-        )
+        self._task = asyncio.create_task(self._client.start(token), name="discord-bot")
         await self._ready_event.wait()
         logger.info("Discord channel started")
 

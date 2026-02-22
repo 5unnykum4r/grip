@@ -62,7 +62,9 @@ def cron_add(
     name: str = typer.Argument(help="Job name."),  # noqa: B008
     schedule: str = typer.Argument(help="Cron expression (e.g. '*/5 * * * *')."),  # noqa: B008
     prompt: str = typer.Argument(help="Prompt to send to the agent when the job fires."),  # noqa: B008
-    reply_to: str = typer.Option("", "--reply-to", "-r", help="Session key to route results to (e.g. 'telegram:12345')."),  # noqa: B008
+    reply_to: str = typer.Option(
+        "", "--reply-to", "-r", help="Session key to route results to (e.g. 'telegram:12345')."
+    ),  # noqa: B008
 ) -> None:
     """Add a new cron job."""
     svc = _get_cron_service()

@@ -63,8 +63,7 @@ class TestCategorySearch:
 
     def test_no_category_returns_all(self, memory_mgr: MemoryManager):
         memory_mgr.write_memory(
-            "- [preference] User likes dark mode\n"
-            "- [project] Working on grip-ai\n"
+            "- [preference] User likes dark mode\n- [project] Working on grip-ai\n"
         )
         results = memory_mgr.search_memory("user")
         assert len(results) >= 1
@@ -73,9 +72,7 @@ class TestCategorySearch:
 class TestMemoryStats:
     def test_stats_returns_correct_counts(self, memory_mgr: MemoryManager):
         memory_mgr.write_memory(
-            "- [preference] Dark mode\n"
-            "- [preference] Python\n"
-            "- [project] grip-ai\n"
+            "- [preference] Dark mode\n- [preference] Python\n- [project] grip-ai\n"
         )
         stats = memory_mgr.get_memory_stats()
         assert stats["total_entries"] == 3
@@ -111,17 +108,11 @@ class TestMemoryCompaction:
         assert removed == 0
 
     def test_configurable_threshold(self, memory_mgr: MemoryManager):
-        memory_mgr.write_memory(
-            "- Alpha beta gamma delta epsilon\n"
-            "- Alpha beta gamma delta zeta\n"
-        )
+        memory_mgr.write_memory("- Alpha beta gamma delta epsilon\n- Alpha beta gamma delta zeta\n")
         removed_strict = memory_mgr.compact_memory(similarity_threshold=0.95)
         assert removed_strict == 0
 
-        memory_mgr.write_memory(
-            "- Alpha beta gamma delta epsilon\n"
-            "- Alpha beta gamma delta zeta\n"
-        )
+        memory_mgr.write_memory("- Alpha beta gamma delta epsilon\n- Alpha beta gamma delta zeta\n")
         removed_loose = memory_mgr.compact_memory(similarity_threshold=0.5)
         assert removed_loose >= 1
 

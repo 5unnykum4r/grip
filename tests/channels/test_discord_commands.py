@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from grip.bus.events import InboundMessage
-from grip.bus.queue import MessageBus
-from grip.channels.discord import DiscordChannel, _DISCORD_COMMANDS
+from grip.channels.discord import _DISCORD_COMMANDS
 from grip.config.schema import ChannelEntry
 
 
@@ -20,7 +17,13 @@ def _make_config(**overrides) -> ChannelEntry:
     return ChannelEntry(**defaults)
 
 
-def _make_discord_message(content: str, author_id: int = 12345, channel_id: int = 99, guild_id: int = 1, message_id: int = 555):
+def _make_discord_message(
+    content: str,
+    author_id: int = 12345,
+    channel_id: int = 99,
+    guild_id: int = 1,
+    message_id: int = 555,
+):
     """Build a mock discord.Message with the given content."""
     author = SimpleNamespace(id=author_id, bot=False)
     guild = SimpleNamespace(id=guild_id)
@@ -40,7 +43,7 @@ class TestDiscordCommandParsing:
         assert set(_DISCORD_COMMANDS.keys()) == expected
 
     def test_command_descriptions_are_strings(self):
-        for cmd, desc in _DISCORD_COMMANDS.items():
+        for _cmd, desc in _DISCORD_COMMANDS.items():
             assert isinstance(desc, str)
             assert len(desc) > 0
 

@@ -13,8 +13,6 @@ Stop:  Ctrl+C (SIGINT) or SIGTERM for graceful shutdown
 
 from __future__ import annotations
 
-from grip import __version__
-
 import asyncio
 import contextlib
 import signal
@@ -23,6 +21,7 @@ import typer
 from loguru import logger
 from rich.console import Console
 
+from grip import __version__
 from grip.bus.events import InboundMessage, OutboundMessage
 from grip.bus.queue import MessageBus
 from grip.channels.manager import ChannelManager
@@ -54,7 +53,9 @@ def gateway_command(
         console.print("\n[dim]Gateway shutdown by user.[/dim]")
 
 
-async def _run_gateway(config: GripConfig, host: str | None = None, port: int | None = None) -> None:
+async def _run_gateway(
+    config: GripConfig, host: str | None = None, port: int | None = None
+) -> None:
     """Main async entry point for the gateway process."""
     if host:
         config.gateway.host = host
@@ -183,66 +184,83 @@ async def _consume_inbound(
         if command == "undo":
             session = session_mgr.get_or_create(session_key)
             if session.message_count < 2:
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text="Nothing to undo.",
-                ))
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text="Nothing to undo.",
+                    )
+                )
             else:
                 session.messages = session.messages[:-2]
                 session_mgr.save(session)
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text="Last exchange removed.",
-                ))
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text="Last exchange removed.",
+                    )
+                )
             continue
 
         if command == "compact":
             session = session_mgr.get_or_create(session_key)
             if session.message_count < 4:
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text="Session too short to compact.",
-                ))
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text="Session too short to compact.",
+                    )
+                )
                 continue
             try:
                 await engine.consolidate_session(session_key)
                 # Re-fetch the session to get the updated message count
                 session = session_mgr.get_or_create(session_key)
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text=f"Session compacted. {session.message_count} messages remain.",
-                ))
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text=f"Session compacted. {session.message_count} messages remain.",
+                    )
+                )
             except Exception as exc:
                 logger.error("Compact failed for {}: {}", session_key, exc)
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text=f"Compact failed: {exc}",
-                ))
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text=f"Compact failed: {exc}",
+                    )
+                )
             continue
 
         if command == "model":
             model_name = msg.metadata.get("model_name", "").strip()
             if model_name:
                 session_models[session_key] = model_name
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text=f"Model switched to: {model_name}",
-                ))
-            else:
-                current = session_models.get(
-                    session_key, config.agents.defaults.model
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text=f"Model switched to: {model_name}",
+                    )
                 )
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text=f"Current model: {current}",
-                ))
+            else:
+                current = session_models.get(session_key, config.agents.defaults.model)
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text=f"Current model: {current}",
+                    )
+                )
             continue
 
         if command == "status":
             session = session_mgr.get_or_create(session_key)
-            model = session_models.get(
-                session_key, config.agents.defaults.model
-            )
+            model = session_models.get(session_key, config.agents.defaults.model)
             mem = memory_mgr.read_memory()
             mem_lines = len(mem.strip().splitlines()) if mem.strip() else 0
             trusted = trust_mgr.trusted_directories
@@ -254,16 +272,20 @@ async def _consume_inbound(
                 f"Memory facts: ~{mem_lines} lines\n"
                 f"Trusted dirs: {trust_line}"
             )
-            await bus.publish_outbound(OutboundMessage(
-                channel=msg.channel, chat_id=msg.chat_id,
-                text=status_text,
-            ))
+            await bus.publish_outbound(
+                OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    text=status_text,
+                )
+            )
             continue
 
         if command == "trust":
             trust_path_str = msg.metadata.get("trust_path", "").strip()
             if trust_path_str:
                 from pathlib import Path
+
                 parts = trust_path_str.split(maxsplit=1)
 
                 if parts[0] == "revoke" and len(parts) > 1:
@@ -277,27 +299,35 @@ async def _consume_inbound(
                     trust_mgr.trust(trust_path)
                     text = f"Trusted: {trust_path}"
 
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text=text,
-                ))
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text=text,
+                    )
+                )
             else:
                 dirs = trust_mgr.trusted_directories
                 if dirs:
                     text = "Trusted directories:\n" + "\n".join(f"  {d}" for d in dirs)
                 else:
                     text = "No directories trusted yet. Use /trust ~/path to trust a directory."
-                await bus.publish_outbound(OutboundMessage(
-                    channel=msg.channel, chat_id=msg.chat_id,
-                    text=text,
-                ))
+                await bus.publish_outbound(
+                    OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        text=text,
+                    )
+                )
             continue
 
         # Normal message -- run through the engine
         model_override = session_models.get(session_key)
         try:
             result = await engine.run(
-                msg.text, session_key=session_key, model=model_override,
+                msg.text,
+                session_key=session_key,
+                model=model_override,
             )
             outbound = OutboundMessage(
                 channel=msg.channel,
@@ -333,6 +363,7 @@ def _wire_engine_messaging(engine: EngineProtocol, bus: MessageBus) -> None:
     if isinstance(engine, LiteLLMRunner):
         _wire_message_tool(engine.registry, bus)
     elif isinstance(engine, SDKRunner):
+
         async def _send_via_bus(session_key: str, text: str) -> None:
             parts = session_key.split(":", 1)
             channel = parts[0] if len(parts) > 1 else "cli"
@@ -343,9 +374,14 @@ def _wire_engine_messaging(engine: EngineProtocol, bus: MessageBus) -> None:
             parts = session_key.split(":", 1)
             channel = parts[0] if len(parts) > 1 else "cli"
             chat_id = parts[1] if len(parts) > 1 else session_key
-            await bus.publish_outbound(OutboundMessage(
-                channel=channel, chat_id=chat_id, text=caption, file_path=file_path,
-            ))
+            await bus.publish_outbound(
+                OutboundMessage(
+                    channel=channel,
+                    chat_id=chat_id,
+                    text=caption,
+                    file_path=file_path,
+                )
+            )
 
         engine.set_send_callback(_send_via_bus)
         engine.set_send_file_callback(_send_file_via_bus)
@@ -375,9 +411,14 @@ def _wire_message_tool(registry, bus: MessageBus) -> None:
             parts = session_key.split(":", 1)
             channel = parts[0] if len(parts) > 1 else "cli"
             chat_id = parts[1] if len(parts) > 1 else session_key
-            await bus.publish_outbound(OutboundMessage(
-                channel=channel, chat_id=chat_id, text=caption, file_path=file_path,
-            ))
+            await bus.publish_outbound(
+                OutboundMessage(
+                    channel=channel,
+                    chat_id=chat_id,
+                    text=caption,
+                    file_path=file_path,
+                )
+            )
 
         file_tool.set_callback(_send_file_via_bus)
 

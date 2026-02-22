@@ -344,6 +344,7 @@ async def get_metrics(
     check_token_rate_limit(request, token)
 
     from grip.observe.metrics import get_metrics as _get_metrics
+
     metrics = _get_metrics()
     return {"metrics": metrics.snapshot().to_dict()}
 
@@ -371,11 +372,13 @@ async def list_workflows(
     for name in names:
         wf = store.load(name)
         if wf:
-            workflows.append({
-                "name": wf.name,
-                "description": wf.description,
-                "step_count": len(wf.steps),
-            })
+            workflows.append(
+                {
+                    "name": wf.name,
+                    "description": wf.description,
+                    "step_count": len(wf.steps),
+                }
+            )
     return {"workflows": workflows, "count": len(workflows)}
 
 
@@ -413,4 +416,5 @@ def _get_workflow_store(request: Request):
         return None
 
     from grip.workflow.store import WorkflowStore
+
     return WorkflowStore(workspace.root / "workflows")

@@ -37,7 +37,9 @@ class CrashRecovery:
 
         def _handler(signum: int, frame: Any) -> None:
             sig_name = signal.Signals(signum).name
-            logger.warning("Received {} — running {} save callbacks", sig_name, len(self._callbacks))
+            logger.warning(
+                "Received {} — running {} save callbacks", sig_name, len(self._callbacks)
+            )
             for name, callback in self._callbacks:
                 try:
                     callback()
@@ -70,6 +72,7 @@ def validate_config_on_startup(config) -> list[str]:
         has_key = bool(config.providers.get("openrouter", None))
         if not has_key:
             import os
+
             if not os.environ.get("OPENROUTER_API_KEY"):
                 warnings.append(
                     "Default model uses OpenRouter but no API key configured. "

@@ -6,10 +6,10 @@ import pytest
 
 from grip.tools.base import ToolContext
 from grip.tools.document_gen import (
+    _TEMPLATES,
     DocumentGenTool,
     _markdown_to_html,
     _substitute_variables,
-    _TEMPLATES,
     create_document_gen_tools,
 )
 
@@ -81,44 +81,56 @@ class TestDocumentGenTool:
     @pytest.mark.asyncio
     async def test_report_template_produces_markdown(self, ctx):
         tool = DocumentGenTool()
-        result = await tool.execute({
-            "template": "report",
-            "variables": {
-                "title": "Q4 Report",
-                "author": "Test",
-                "summary": "Good quarter.",
-                "details": "Revenue up.",
-                "conclusions": "Keep going.",
+        result = await tool.execute(
+            {
+                "template": "report",
+                "variables": {
+                    "title": "Q4 Report",
+                    "author": "Test",
+                    "summary": "Good quarter.",
+                    "details": "Revenue up.",
+                    "conclusions": "Keep going.",
+                },
             },
-        }, ctx)
+            ctx,
+        )
         assert "Q4 Report" in result
         assert "Good quarter." in result
 
     @pytest.mark.asyncio
     async def test_html_output_format(self, ctx):
         tool = DocumentGenTool()
-        result = await tool.execute({
-            "template": "custom",
-            "variables": {"content": "# Hello World"},
-            "output_format": "html",
-        }, ctx)
+        result = await tool.execute(
+            {
+                "template": "custom",
+                "variables": {"content": "# Hello World"},
+                "output_format": "html",
+            },
+            ctx,
+        )
         assert "<!DOCTYPE html>" in result
 
     @pytest.mark.asyncio
     async def test_saves_to_file(self, ctx):
         tool = DocumentGenTool()
-        result = await tool.execute({
-            "template": "custom",
-            "variables": {"content": "Test content"},
-            "output_file": "docs/test.md",
-        }, ctx)
+        await tool.execute(
+            {
+                "template": "custom",
+                "variables": {"content": "Test content"},
+                "output_file": "docs/test.md",
+            },
+            ctx,
+        )
         assert (ctx.workspace_path / "docs" / "test.md").exists()
 
     @pytest.mark.asyncio
     async def test_unknown_template_returns_error(self, ctx):
         tool = DocumentGenTool()
-        result = await tool.execute({
-            "template": "nonexistent",
-            "variables": {},
-        }, ctx)
+        result = await tool.execute(
+            {
+                "template": "nonexistent",
+                "variables": {},
+            },
+            ctx,
+        )
         assert "Error" in result
