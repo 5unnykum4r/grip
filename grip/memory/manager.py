@@ -30,6 +30,8 @@ class MemoryManager:
     process that extracts durable facts from old conversation messages.
     """
 
+    _HISTORY_MAX_BYTES: int = 512_000
+
     def __init__(self, workspace_path: Path) -> None:
         self._memory_dir = workspace_path / "memory"
         self._memory_dir.mkdir(parents=True, exist_ok=True)
@@ -178,14 +180,35 @@ class MemoryManager:
         scored.sort(key=lambda x: x[0], reverse=True)
         return [chunk for _, chunk in scored[:max_results]]
 
+    def _rotate_history(self) -> None:
+        """Archive older half of HISTORY.md when file exceeds size threshold."""
+        lines = self._history_path.read_text(encoding="utf-8").splitlines(keepends=True)
+        midpoint = len(lines) // 2
+        if midpoint == 0:
+            return
+        archive_name = f"HISTORY.archive.{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}.md"
+        archive_path = self._memory_dir / archive_name
+        tmp_archive = archive_path.with_suffix(".tmp")
+        tmp_archive.write_text("".join(lines[:midpoint]), encoding="utf-8")
+        tmp_archive.rename(archive_path)
+        tmp_history = self._history_path.with_suffix(".tmp")
+        tmp_history.write_text("".join(lines[midpoint:]), encoding="utf-8")
+        tmp_history.rename(self._history_path)
+        logger.info("Rotated HISTORY.md: archived {} lines to {}", midpoint, archive_name)
+
     def append_history(self, entry: str) -> None:
         """Append a timestamped entry to HISTORY.md."""
         timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         line = f"[{timestamp}] {entry.rstrip()}\n"
 
-        # Append directly (no atomic rename needed for append-only log)
         with self._history_path.open("a", encoding="utf-8") as f:
             f.write(line)
+
+        try:
+            if self._history_path.stat().st_size > self._HISTORY_MAX_BYTES:
+                self._rotate_history()
+        except OSError:
+            pass
 
     def needs_consolidation(self, message_count: int, memory_window: int) -> bool:
         """Check if consolidation should run based on message count vs window."""
