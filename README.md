@@ -1,6 +1,6 @@
 <div align="center">
   <h1>grip-ai</h1>
-  <p>Async-first agentic AI platform — self-hostable, multi-provider, multi-channel.</p>
+  <p>Claude Agent SDK powered AI platform — self-hostable, multi-model fallback via LiteLLM, multi-channel.</p>
   <p>
     <a href="#installation"><strong>Install</strong></a> &nbsp;&middot;&nbsp;
     <a href="#quickstart"><strong>Quickstart</strong></a> &nbsp;&middot;&nbsp;
@@ -15,18 +15,20 @@
   <a href="https://pypi.org/project/grip-ai/"><img src="https://img.shields.io/pypi/v/grip-ai.svg" alt="PyPI Version"></a>
   <img src="https://img.shields.io/badge/python-3.12%2B-blue" alt="Python 3.12+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
+  <img src="https://img.shields.io/badge/engine-Claude%20Agent%20SDK-blueviolet" alt="Claude Agent SDK">
   <img src="https://img.shields.io/badge/providers-14-orange" alt="14 LLM Providers">
 </p>
 
 ---
 
-grip is a self-hostable AI agent platform built with Python and [uv](https://docs.astral.sh/uv/). Connect 14 LLM providers, chat over Telegram/Discord/Slack, schedule cron tasks, orchestrate multi-agent workflows, and expose a secure REST API — all from a single process.
+grip is a self-hostable AI agent platform built with Python and [uv](https://docs.astral.sh/uv/). It uses the **Claude Agent SDK** as its primary engine for Claude models, with a **LiteLLM fallback** for 14+ other providers (OpenAI, DeepSeek, Groq, Gemini, Ollama, etc.). Chat over Telegram/Discord/Slack, schedule cron tasks, orchestrate multi-agent workflows, and expose a secure REST API — all from a single process.
 
 ## Features
 
 | Category | Details |
 |----------|---------|
-| **LLM Providers** | OpenRouter, Anthropic, OpenAI, DeepSeek, Groq, Google Gemini, Qwen, MiniMax, Moonshot (Kimi), Ollama, vLLM, Llama.cpp, LM Studio, and any OpenAI-compatible API |
+| **Dual Engine** | Claude Agent SDK (primary, recommended) + LiteLLM fallback for non-Claude models |
+| **LLM Providers** | Anthropic (via SDK), OpenRouter, OpenAI, DeepSeek, Groq, Google Gemini, Qwen, MiniMax, Moonshot (Kimi), Ollama, vLLM, Llama.cpp, LM Studio, and any OpenAI-compatible API |
 | **Built-in Tools** | File read/write/edit/append/list/delete, shell execution, web search (Brave + DuckDuckGo), web fetch, messaging, subagent spawning, finance (yfinance), MCP tools |
 | **Chat Channels** | Telegram (bot commands, photos, documents, voice), Discord, Slack (Socket Mode) |
 | **REST API** | FastAPI with bearer auth, rate limiting, audit logging, security headers, 21 endpoints |
@@ -35,6 +37,27 @@ grip is a self-hostable AI agent platform built with Python and [uv](https://doc
 | **Scheduling** | Cron jobs with channel delivery, heartbeat service, natural language scheduling |
 | **Skills** | 18 built-in markdown skills, workspace overrides, install/remove via CLI |
 | **Observability** | OpenTelemetry tracing, in-memory metrics, crash recovery, config validation |
+
+## Engine Modes
+
+grip uses a dual-engine architecture controlled by the `engine` config field:
+
+| Engine | Config Value | Use Case |
+|--------|-------------|----------|
+| **Claude Agent SDK** | `claude_sdk` (default) | Anthropic Claude models — full agentic loop, tool execution, and context management handled by the SDK |
+| **LiteLLM** | `litellm` | Non-Claude models (OpenAI, DeepSeek, Groq, Gemini, Ollama, etc.) — uses grip's internal agent loop with LiteLLM for API calls |
+
+Switch engines via config:
+
+```bash
+# Use Claude Agent SDK (default)
+grip config set agents.defaults.engine "claude_sdk"
+
+# Use LiteLLM for non-Claude models
+grip config set agents.defaults.engine "litellm"
+```
+
+The onboarding wizard (`grip onboard`) automatically sets the right engine based on your provider choice.
 
 ## <a id="installation"></a>Installation
 
@@ -71,11 +94,19 @@ uv sync --extra all          # Everything above
 uv tool install .
 ```
 
+### Optional: Multi-Model Support
+
+To use non-Claude models (OpenAI, DeepSeek, Groq, Gemini, Ollama, etc.), install the LiteLLM extra:
+
+```bash
+uv sync --extra litellm
+```
+
 ### Requirements
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) package manager
-- An API key from at least one LLM provider (OpenRouter, Anthropic, OpenAI, etc.)
+- An Anthropic API key (for Claude Agent SDK) or an API key from another LLM provider (with `--extra litellm`)
 
 ## <a id="quickstart"></a>Quickstart
 
@@ -86,7 +117,7 @@ grip onboard
 ```
 
 The wizard walks you through:
-- Selecting an LLM provider (OpenRouter, Anthropic, OpenAI, etc.)
+- Choosing your engine: **Claude Agent SDK** (recommended) or LiteLLM (14+ providers)
 - Entering your API key
 - Choosing a default model
 - Initializing the workspace (`~/.grip/workspace/`)
@@ -250,7 +281,7 @@ grip config set agents.defaults.temperature 0.7
 
 | Section | Description |
 |---------|-------------|
-| `agents.defaults` | Default model, max_tokens, temperature, memory_window, workspace path |
+| `agents.defaults` | Engine (`claude_sdk`/`litellm`), SDK model, default model, max_tokens, temperature, memory_window, workspace path |
 | `agents.profiles` | Named agent configs (model, tools_allowed, tools_denied, system_prompt_file) |
 | `agents.model_tiers` | Cost-aware routing: different models for low/medium/high complexity prompts |
 | `providers` | Per-provider API keys and base URLs |
@@ -513,15 +544,26 @@ Every command the agent tries to run via the `exec` tool is scanned against a ro
 
 ## Docker
 
-Grip is Docker-ready and can be configured entirely via environment variables.
+Grip is Docker-ready and can be configured entirely via environment variables. The Dockerfile includes Node.js (required by the Claude Agent SDK).
 
 ```bash
 # Build from source
 docker build -t grip .
 
-# Run with environment variables (recommended)
+# Run with Claude Agent SDK (recommended)
 docker run -d \
   -p 18800:18800 \
+  -e ANTHROPIC_API_KEY="sk-ant-..." \
+  -e GRIP_CHANNELS__TELEGRAM__ENABLED="true" \
+  -e GRIP_CHANNELS__TELEGRAM__TOKEN="bot-token" \
+  -v ~/.grip:/root/.grip \
+  --name grip-agent \
+  grip
+
+# Run with LiteLLM engine (non-Claude models)
+docker run -d \
+  -p 18800:18800 \
+  -e GRIP_AGENTS__DEFAULTS__ENGINE="litellm" \
   -e GRIP_PROVIDERS__OPENAI__API_KEY="sk-..." \
   -e GRIP_CHANNELS__TELEGRAM__ENABLED="true" \
   -e GRIP_CHANNELS__TELEGRAM__TOKEN="bot-token" \
