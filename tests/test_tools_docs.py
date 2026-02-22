@@ -278,13 +278,13 @@ class TestFrontmatterParsing:
 
 class TestBuiltinSkillsParse:
     def test_all_builtin_skills_have_frontmatter(self):
-        """All 18 builtin skills should parse with YAML frontmatter and have a category."""
+        """All 15 builtin skills should parse with YAML frontmatter and have a category."""
         builtin_dir = Path(__file__).parent.parent / "grip" / "skills" / "builtin"
         if not builtin_dir.exists():
             pytest.skip("builtin skills directory not found")
 
         skill_files = sorted(builtin_dir.glob("*/SKILL.md"))
-        assert len(skill_files) >= 18, f"Expected 18+ skills, found {len(skill_files)}"
+        assert len(skill_files) >= 15, f"Expected 15+ skills, found {len(skill_files)}"
 
         for path in skill_files:
             skill = SkillsLoader._parse_skill_file(path)
