@@ -1,16 +1,14 @@
-<p align="center">
-  <h1 align="center">grip-ai</h1>
-  <p align="center">
-    Async-first agentic AI platform — self-hostable, multi-provider, multi-channel.
-  </p>
-  <p align="center">
+<div align="center">
+  <h1>grip-ai</h1>
+  <p>Async-first agentic AI platform — self-hostable, multi-provider, multi-channel.</p>
+  <p>
     <a href="#installation"><strong>Install</strong></a> &nbsp;&middot;&nbsp;
     <a href="#quickstart"><strong>Quickstart</strong></a> &nbsp;&middot;&nbsp;
     <a href="#telegram-setup"><strong>Telegram</strong></a> &nbsp;&middot;&nbsp;
     <a href="#api-reference"><strong>API</strong></a> &nbsp;&middot;&nbsp;
     <a href="#configuration"><strong>Config</strong></a>
   </p>
-</p>
+</div>
 
 <p align="center">
   <a href="https://github.com/5unnykum4r/grip-ai/actions/workflows/ci.yml"><img src="https://github.com/5unnykum4r/grip-ai/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
@@ -38,7 +36,7 @@ grip is a self-hostable AI agent platform built with Python and [uv](https://doc
 | **Skills** | 18 built-in markdown skills, workspace overrides, install/remove via CLI |
 | **Observability** | OpenTelemetry tracing, in-memory metrics, crash recovery, config validation |
 
-## Installation
+## <a id="installation"></a>Installation
 
 ### Recommended: Via PyPI
 
@@ -79,7 +77,7 @@ uv tool install .
 - [uv](https://docs.astral.sh/uv/) package manager
 - An API key from at least one LLM provider (OpenRouter, Anthropic, OpenAI, etc.)
 
-## Quickstart
+## <a id="quickstart"></a>Quickstart
 
 ### 1. Run the Setup Wizard
 
@@ -130,7 +128,7 @@ The gateway is the long-running process that connects everything — Telegram, c
 grip gateway
 ```
 
-## Telegram Setup
+## <a id="telegram-setup"></a>Telegram Setup
 
 ### Step 1: Create a Bot
 
@@ -234,7 +232,7 @@ When a conversation gets long, compress it to save tokens:
 
 Global flags: `--verbose` / `-v`, `--quiet` / `-q`, `--config` / `-c PATH`, `--dry-run`.
 
-## Configuration
+## <a id="configuration"></a>Configuration
 
 Config is stored at `~/.grip/config.json`. Environment variables override with `GRIP_` prefix and `__` nested delimiter.
 
@@ -399,7 +397,7 @@ grip cron remove <job-id>
 
 When chatting via Telegram/Discord/Slack, the agent automatically sets `--reply-to` so cron results are delivered to your chat.
 
-## API Reference
+## <a id="api-reference"></a>API Reference
 
 Start the API server standalone or as part of the gateway:
 
