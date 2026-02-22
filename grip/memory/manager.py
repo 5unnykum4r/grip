@@ -71,12 +71,15 @@ class MemoryManager:
             return self._history_path.read_text(encoding="utf-8")
         return ""
 
-    def search_history(self, query: str, *, max_results: int = 20) -> list[str]:
-        """Search HISTORY.md using keyword-weighted relevance scoring.
+    def search_history(
+        self, query: str, *, max_results: int = 20, decay_rate: float = 0.001
+    ) -> list[str]:
+        """Search HISTORY.md using keyword-weighted relevance scoring with time decay.
 
         Tokenizes the query into keywords, scores each history line by
         TF-IDF-style relevance (term frequency * inverse document frequency),
-        and returns the top results sorted by score descending.
+        applies a time-decay factor so recent entries rank higher, and
+        returns the top results sorted by score descending.
         Falls back to simple substring match if the query is very short.
         """
         content = self.read_history()
@@ -89,12 +92,10 @@ class MemoryManager:
 
         query_tokens = _tokenize(query)
 
-        # For single-word or very short queries, use simple substring matching
         if len(query_tokens) <= 1:
             query_lower = query.lower()
             return [line for line in lines if query_lower in line.lower()][:max_results]
 
-        # Build document frequency (how many lines contain each token)
         doc_freq: Counter[str] = Counter()
         line_token_sets: list[set[str]] = []
         for line in lines:
@@ -104,8 +105,8 @@ class MemoryManager:
                 doc_freq[token] += 1
 
         total_docs = len(lines)
+        now = datetime.now(UTC)
 
-        # Score each line by sum of TF-IDF for matching query tokens
         scored: list[tuple[float, str]] = []
         for line in lines:
             line_tokens = _tokenize(line)
@@ -119,28 +120,44 @@ class MemoryManager:
                     df = doc_freq.get(qt, 0)
                     idf = math.log((total_docs + 1) / (df + 1)) + 1.0
                     score += tf * idf
+            if score > 0 and decay_rate > 0:
+                ts_match = _TIMESTAMP_RE.match(line)
+                if ts_match:
+                    try:
+                        entry_time = datetime.strptime(
+                            ts_match.group(1), "%Y-%m-%d %H:%M:%S"
+                        ).replace(tzinfo=UTC)
+                        age_hours = (now - entry_time).total_seconds() / 3600
+                        score *= 1.0 / (1.0 + age_hours * decay_rate)
+                    except ValueError:
+                        pass
             if score > 0:
                 scored.append((score, line))
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [line for _, line in scored[:max_results]]
 
-    def search_memory(self, query: str, *, max_results: int = 10) -> list[str]:
+    def search_memory(
+        self, query: str, *, max_results: int = 10, category: str | None = None
+    ) -> list[str]:
         """Search MEMORY.md using keyword-weighted relevance scoring.
 
         Same TF-IDF approach as search_history but applied to the structured
         facts in MEMORY.md. Returns matching bullet points or sections.
+        When category is provided, only entries matching ``- [category]`` are searched.
         """
         content = self.read_memory()
         if not content:
             return []
 
-        # Split memory into logical chunks (bullet points or paragraphs)
         chunks: list[str] = []
         for line in content.splitlines():
             stripped = line.strip()
             if stripped:
                 chunks.append(stripped)
+
+        if category:
+            chunks = [c for c in chunks if c.startswith(f"- [{category}]")]
 
         if not chunks:
             return []
@@ -179,6 +196,58 @@ class MemoryManager:
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [chunk for _, chunk in scored[:max_results]]
+
+    def get_memory_stats(self) -> dict[str, Any]:
+        """Return statistics about memory and history usage."""
+        content = self.read_memory()
+        chunks = [line.strip() for line in content.splitlines() if line.strip()]
+        categories: Counter[str] = Counter()
+        for chunk in chunks:
+            cat_match = re.match(r"^- \[(\w+)\]", chunk)
+            if cat_match:
+                categories[cat_match.group(1)] += 1
+        history_bytes = 0
+        if self._history_path.exists():
+            history_bytes = self._history_path.stat().st_size
+        return {
+            "total_entries": len(chunks),
+            "categories": dict(categories),
+            "memory_size_bytes": len(content.encode("utf-8")),
+            "history_size_bytes": history_bytes,
+        }
+
+    def compact_memory(self, similarity_threshold: float = 0.7) -> int:
+        """Deduplicate memory entries using Jaccard similarity on token sets.
+
+        Returns number of entries removed.
+        """
+        content = self.read_memory()
+        if not content:
+            return 0
+        chunks = [line.strip() for line in content.splitlines() if line.strip()]
+        if len(chunks) < 2:
+            return 0
+
+        token_sets = [set(_tokenize(chunk)) for chunk in chunks]
+        keep = [True] * len(chunks)
+
+        for i in range(len(chunks)):
+            if not keep[i]:
+                continue
+            for j in range(i + 1, len(chunks)):
+                if not keep[j] or not token_sets[i] or not token_sets[j]:
+                    continue
+                intersection = len(token_sets[i] & token_sets[j])
+                union = len(token_sets[i] | token_sets[j])
+                if union > 0 and intersection / union >= similarity_threshold:
+                    keep[j] = False
+
+        deduplicated = [c for c, k in zip(chunks, keep) if k]
+        removed = len(chunks) - len(deduplicated)
+        if removed > 0:
+            self.write_memory("\n".join(deduplicated) + "\n")
+            logger.info("Memory compacted: removed {} duplicate entries", removed)
+        return removed
 
     def _rotate_history(self) -> None:
         """Archive older half of HISTORY.md when file exceeds size threshold."""
@@ -316,6 +385,7 @@ _STOPWORDS: frozenset[str] = frozenset({
 })
 
 _WORD_RE = re.compile(r"[a-z0-9_]+")
+_TIMESTAMP_RE = re.compile(r"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) UTC\]")
 
 
 def _tokenize(text: str) -> list[str]:
