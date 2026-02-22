@@ -20,12 +20,11 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
 
-from grip.agent.loop import AgentLoop, AgentRunResult
 from grip.config import GripConfig, load_config
+from grip.engines.factory import create_engine
+from grip.engines.types import AgentRunResult, EngineProtocol
 from grip.memory import MemoryManager
-from grip.providers.registry import create_provider
 from grip.session import SessionManager
-from grip.tools import create_default_registry
 from grip.workspace import WorkspaceManager
 
 console = Console()
@@ -79,34 +78,28 @@ def _ensure_workspace(config: GripConfig) -> WorkspaceManager:
     return ws
 
 
-def _build_loop(config: GripConfig) -> tuple[AgentLoop, SessionManager, MemoryManager]:
-    """Wire up the full agent stack from config."""
+def _build_engine(config: GripConfig) -> tuple[EngineProtocol, SessionManager, MemoryManager]:
+    """Wire up the engine stack from config using the engine factory."""
     ws = _ensure_workspace(config)
-    provider = create_provider(config)
-    mcp_servers = config.tools.mcp_servers
-    registry = create_default_registry(mcp_servers=mcp_servers)
     session_mgr = SessionManager(ws.root / "sessions")
     memory_mgr = MemoryManager(ws.root)
 
     # Seed TOOLS.md at startup so it exists before the first run().
-    # AgentLoop.run() regenerates it on every call to pick up new skills.
+    # The LiteLLM engine regenerates it on every call to pick up new skills;
+    # the SDK engine does not use TOOLS.md, but generating it here is harmless.
     from grip.skills.loader import SkillsLoader
+    from grip.tools import create_default_registry
     from grip.tools.docs import generate_tools_md
 
+    mcp_servers = config.tools.mcp_servers
+    registry = create_default_registry(mcp_servers=mcp_servers)
     loader = SkillsLoader(ws.root)
     loader.scan()
     tools_md = generate_tools_md(registry, loader.list_skills(), config.tools.mcp_servers)
     (ws.root / "TOOLS.md").write_text(tools_md, encoding="utf-8")
 
-    loop = AgentLoop(
-        config,
-        provider,
-        ws,
-        tool_registry=registry,
-        session_manager=session_mgr,
-        memory_manager=memory_mgr,
-    )
-    return loop, session_mgr, memory_mgr
+    engine = create_engine(config, ws, session_mgr, memory_mgr)
+    return engine, session_mgr, memory_mgr
 
 
 def _print_response(text: str, no_markdown: bool) -> None:
@@ -143,8 +136,8 @@ def _print_stats(result: AgentRunResult) -> None:
     parts: list[str] = []
     if result.iterations > 1:
         parts.append(f"{result.iterations} iterations")
-    if result.total_usage.total_tokens > 0:
-        parts.append(f"{result.total_usage.total_tokens} tokens")
+    if result.total_tokens > 0:
+        parts.append(f"{result.total_tokens} tokens")
     if parts:
         console.print(f"[dim]({' | '.join(parts)})[/dim]")
 
@@ -153,10 +146,10 @@ async def _one_shot(
     config: GripConfig, message: str, *, model: str | None, no_markdown: bool
 ) -> None:
     """Send a single message, print the response, and exit."""
-    loop, _, _ = _build_loop(config)
+    engine, _, _ = _build_engine(config)
 
     with Live(Spinner("dots", text="Thinking..."), console=console, transient=True):
-        result = await loop.run(message, session_key="cli:oneshot", model=model)
+        result = await engine.run(message, session_key="cli:oneshot", model=model)
 
     _print_response(result.response, no_markdown)
     _print_stats(result)
@@ -167,7 +160,7 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
     from prompt_toolkit import PromptSession
     from prompt_toolkit.history import FileHistory
 
-    loop, session_mgr, memory_mgr = _build_loop(config)
+    engine, session_mgr, memory_mgr = _build_engine(config)
     session_key = _SESSION_KEY
 
     history_dir = Path("~/.grip/history").expanduser()
@@ -206,7 +199,7 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
                 break
 
             elif cmd == "/new":
-                session_mgr.delete(session_key)
+                await engine.reset_session(session_key)
                 session_key = _SESSION_KEY
                 console.print("[green]New session started.[/green]")
                 continue
@@ -259,7 +252,9 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
                     console=console,
                     transient=True,
                 ):
-                    await loop.consolidate_session(session)
+                    await engine.consolidate_session(session_key)
+                # Re-read the session to get updated message count after compaction
+                session = session_mgr.get_or_create(session_key)
                 console.print(
                     f"[green]Session compacted. {session.message_count} messages remain.[/green]"
                 )
@@ -389,7 +384,7 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
         # Run the agent
         with Live(Spinner("dots", text="Thinking..."), console=console, transient=True):
             try:
-                result = await loop.run(user_input, session_key=session_key, model=model)
+                result = await engine.run(user_input, session_key=session_key, model=model)
             except Exception as exc:
                 console.print(f"[red]Error: {exc}[/red]")
                 logger.exception("Agent run failed")
