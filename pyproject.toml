@@ -1,7 +1,7 @@
 [project]
 name = "grip-ai"
-version = "0.1.1"
-description = "Async-first agentic AI platform with multi-provider LLM support, tool execution, and multi-channel chat integration."
+version = "0.2.0"
+description = "Claude Agent SDK powered AI agent platform with multi-model fallback, tool execution, and multi-channel chat integration."
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -32,8 +32,7 @@ dependencies = [
     "loguru>=0.7",
     "httpx>=0.27",
     "anyio>=4.0",
-    "litellm>=1.0",
-    "json-repair>=0.30",
+    "claude-agent-sdk>=0.1.0",
     "typer>=0.12",
     "rich>=13.0",
     "InquirerPy>=0.3.4",
@@ -51,6 +50,7 @@ Issues = "https://github.com/5unnykum4r/grip-ai/issues"
 Documentation = "https://github.com/5unnykum4r/grip-ai#readme"
 
 [project.optional-dependencies]
+litellm = ["litellm>=1.0", "json-repair>=0.30"]
 discord = ["discord.py>=2.0"]
 slack = ["slack-sdk>=3.26"]
 mcp = ["mcp>=1.0"]
@@ -58,6 +58,8 @@ finance = ["yfinance>=0.2"]
 viz = ["plotext>=5.3"]
 observe = ["opentelemetry-api", "opentelemetry-sdk"]
 all = [
+    "litellm>=1.0",
+    "json-repair>=0.30",
     "discord.py>=2.0",
     "slack-sdk>=3.26",
     "mcp>=1.0",
