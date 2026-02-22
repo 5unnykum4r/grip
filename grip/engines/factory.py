@@ -89,12 +89,13 @@ def create_engine(
         automatic fallback).
     """
     engine_choice = config.agents.defaults.engine
+    engine: EngineProtocol
 
     if engine_choice == "claude_sdk":
         try:
             sdk_runner_cls = _import_sdk_runner()
             logger.info("Using Claude Agent SDK engine (SDKRunner).")
-            return sdk_runner_cls(
+            engine = sdk_runner_cls(
                 config=config,
                 workspace=workspace,
                 session_mgr=session_mgr,
@@ -106,11 +107,21 @@ def create_engine(
                 "claude_agent_sdk is not installed; falling back to LiteLLM engine. "
                 "Install it with: pip install claude-agent-sdk"
             )
-            return _build_litellm_runner(
+            engine = _build_litellm_runner(
                 config, workspace, session_mgr, memory_mgr, trust_mgr
             )
+    else:
+        logger.info("Using LiteLLM engine (LiteLLMRunner).")
+        engine = _build_litellm_runner(config, workspace, session_mgr, memory_mgr, trust_mgr)
 
-    # engine_choice == "litellm" (the regex pattern on the field guarantees
-    # only "claude_sdk" or "litellm" reach this point)
-    logger.info("Using LiteLLM engine (LiteLLMRunner).")
-    return _build_litellm_runner(config, workspace, session_mgr, memory_mgr, trust_mgr)
+    max_daily = config.agents.defaults.max_daily_tokens
+    if max_daily > 0:
+        from grip.engines.tracked import TrackedEngine
+        from grip.security.token_tracker import TokenTracker
+
+        state_dir = config.agents.defaults.workspace.expanduser().resolve() / "state"
+        tracker = TokenTracker(state_dir, max_daily)
+        engine = TrackedEngine(engine, tracker)
+        logger.info("Token tracking enabled (daily limit: %d)", max_daily)
+
+    return engine
