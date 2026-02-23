@@ -24,7 +24,7 @@ from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.table import Table
 
-from grip.config import GripConfig, load_config
+from grip.config import GripConfig, config_exists, load_config
 from grip.engines.factory import create_engine
 from grip.engines.types import AgentRunResult, EngineProtocol
 from grip.memory import MemoryManager
@@ -128,6 +128,16 @@ def agent_command(
 ) -> None:
     """Chat with the AI agent."""
     from grip.cli.app import state
+
+    if not config_exists(state.config_path):
+        console.print(
+            "\n[yellow]No configuration found. Running setup wizard...[/yellow]\n"
+        )
+        from grip.cli.onboard import onboard_command
+
+        onboard_command()
+        if not config_exists(state.config_path):
+            raise typer.Exit(1)
 
     config = load_config(state.config_path)
     if state.dry_run:

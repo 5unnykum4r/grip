@@ -22,23 +22,45 @@ _mock_sdk = types.ModuleType("claude_agent_sdk")
 _mock_sdk.query = MagicMock(name="query")
 
 
+class _MockSdkMcpTool:
+    """Mock for claude_agent_sdk.SdkMcpTool.
+
+    Behaves like a dataclass with name/description/handler attributes and is
+    also callable (delegates to handler) so existing tests that invoke tool
+    functions directly keep working.
+    """
+
+    def __init__(self, name: str, description: str, input_schema, handler):
+        self.name = name
+        self._tool_name = name
+        self.description = description
+        self.input_schema = input_schema
+        self.handler = handler
+
+    async def __call__(self, *args, **kwargs):
+        return await self.handler(*args, **kwargs)
+
+
 def _mock_tool_decorator(name: str, description: str, input_schema):
     """Mock for claude_agent_sdk.tool(name, description, input_schema).
 
-    Returns a decorator that attaches name/description metadata to the
-    function and returns it unchanged so tests can call it directly.
+    Returns a decorator that wraps the function in a _MockSdkMcpTool,
+    matching the real SDK's SdkMcpTool return type.
     """
 
     def decorator(fn):
-        fn._tool_name = name
-        fn._tool_description = description
-        fn._tool_input_schema = input_schema
-        return fn
+        return _MockSdkMcpTool(name, description, input_schema, fn)
 
     return decorator
 
 
+def _mock_create_sdk_mcp_server(name, version="1.0.0", tools=None):
+    """Mock for claude_agent_sdk.create_sdk_mcp_server."""
+    return {"type": "sdk", "name": name}
+
+
 _mock_sdk.tool = _mock_tool_decorator
+_mock_sdk.create_sdk_mcp_server = _mock_create_sdk_mcp_server
 _mock_sdk.ClaudeAgentOptions = MagicMock(name="ClaudeAgentOptions")
 _mock_sdk.AssistantMessage = type("AssistantMessage", (), {})
 _mock_sdk.ResultMessage = type("ResultMessage", (), {})
@@ -175,13 +197,13 @@ def _build_runner(config, mock_workspace, mock_session_mgr, mock_memory_mgr, tru
 
 
 def _find_tool(tools: list, name: str):
-    """Find a tool function by its _tool_name attribute or __name__."""
-    for fn in tools:
-        tool_name = getattr(fn, "_tool_name", None) or getattr(fn, "__name__", "")
+    """Find a tool by its name attribute (SdkMcpTool-like objects)."""
+    for t in tools:
+        tool_name = getattr(t, "name", None) or getattr(t, "_tool_name", None)
         if tool_name == name:
-            return fn
+            return t
     raise KeyError(
-        f"Tool '{name}' not found in {[getattr(t, '_tool_name', t.__name__) for t in tools]}"
+        f"Tool '{name}' not found in {[getattr(t, 'name', '?') for t in tools]}"
     )
 
 
@@ -575,7 +597,7 @@ class TestBuildCustomTools:
     def test_tool_names(self, config, mock_workspace, mock_session_mgr, mock_memory_mgr):
         runner = _build_runner(config, mock_workspace, mock_session_mgr, mock_memory_mgr)
         tools = runner._build_custom_tools()
-        tool_names = {getattr(fn, "_tool_name", fn.__name__) for fn in tools}
+        tool_names = {t.name for t in tools}
         assert "send_message" in tool_names
         assert "send_file" in tool_names
         assert "remember" in tool_names

@@ -17,6 +17,12 @@ def get_config_path() -> Path:
     return _DEFAULT_CONFIG_FILE
 
 
+def config_exists(path: Path | None = None) -> bool:
+    """Return True if a config file has been written (i.e. onboarding was completed)."""
+    config_path = path or _DEFAULT_CONFIG_FILE
+    return config_path.expanduser().resolve().exists()
+
+
 def get_workspace_path(config: GripConfig | None = None) -> Path:
     if config is None:
         return Path.home() / ".grip" / "workspace"

@@ -22,6 +22,7 @@ from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ResultMessage,
+    create_sdk_mcp_server,
     query,
     tool,
 )
@@ -319,6 +320,19 @@ class SDKRunner(EngineProtocol):
 
         effective_model = model or self._model
 
+        # Wrap custom tools in an in-process MCP server (the SDK expects
+        # ClaudeAgentOptions.tools to be a list of built-in tool name strings,
+        # NOT SdkMcpTool objects).
+        grip_server = create_sdk_mcp_server(
+            "grip_tools", version="1.0.0", tools=custom_tools
+        )
+        mcp_servers: dict[str, Any] = {srv["name"]: srv for srv in mcp_config}
+        mcp_servers["grip_tools"] = grip_server
+
+        # Ensure the custom tool names are in allowed_tools so the SDK permits them
+        custom_tool_names = [t.name for t in custom_tools]
+        allowed_tools.extend(custom_tool_names)
+
         pre_hook = build_pre_tool_use_hook(Path(self._cwd), self._trust_mgr)
         post_hook = build_post_tool_use_hook()
         stop_hook = build_stop_hook(self._memory_mgr)
@@ -333,8 +347,7 @@ class SDKRunner(EngineProtocol):
         options = ClaudeAgentOptions(
             model=effective_model,
             system_prompt=system_prompt,
-            tools=custom_tools,
-            mcp_servers=mcp_config,
+            mcp_servers=mcp_servers,
             permission_mode=self._permission_mode,
             cwd=self._cwd,
             allowed_tools=allowed_tools if allowed_tools else None,

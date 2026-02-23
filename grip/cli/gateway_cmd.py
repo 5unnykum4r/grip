@@ -25,7 +25,7 @@ from grip import __version__
 from grip.bus.events import InboundMessage, OutboundMessage
 from grip.bus.queue import MessageBus
 from grip.channels.manager import ChannelManager
-from grip.config import GripConfig, load_config
+from grip.config import GripConfig, config_exists, load_config
 from grip.cron.service import CronService
 from grip.engines.factory import create_engine
 from grip.engines.types import EngineProtocol
@@ -45,6 +45,16 @@ def gateway_command(
 ) -> None:
     """Start the grip gateway: channels + engine + cron + heartbeat."""
     from grip.cli.app import state
+
+    if not config_exists(state.config_path):
+        console.print(
+            "\n[yellow]No configuration found. Running setup wizard...[/yellow]\n"
+        )
+        from grip.cli.onboard import onboard_command
+
+        onboard_command()
+        if not config_exists(state.config_path):
+            raise typer.Exit(1)
 
     config = load_config(state.config_path)
     try:
