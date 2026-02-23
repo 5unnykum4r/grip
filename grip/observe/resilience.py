@@ -49,6 +49,7 @@ class CrashRecovery:
             sys.exit(128 + signum)
 
         signal.signal(signal.SIGTERM, _handler)
+        signal.signal(signal.SIGINT, _handler)
         self._installed = True
         logger.debug("Crash recovery handlers installed ({} callbacks)", len(self._callbacks))
 

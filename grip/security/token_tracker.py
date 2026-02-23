@@ -81,11 +81,12 @@ class TokenTracker:
 
         Call this BEFORE making an LLM request.
         """
-        if self._data.get("date") != self._today():
-            self._data = self._empty()
+        with self._lock:
+            if self._data.get("date") != self._today():
+                self._data = self._empty()
 
-        if self._max_daily > 0 and self._data["total_tokens"] >= self._max_daily:
-            raise TokenLimitError(self._data["total_tokens"], self._max_daily)
+            if self._max_daily > 0 and self._data["total_tokens"] >= self._max_daily:
+                raise TokenLimitError(self._data["total_tokens"], self._max_daily)
 
     def record(self, prompt_tokens: int, completion_tokens: int) -> None:
         """Record tokens from a completed LLM call (thread-safe)."""

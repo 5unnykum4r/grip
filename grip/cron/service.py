@@ -78,12 +78,16 @@ class CronService:
             return
         try:
             data = json.loads(self._jobs_file.read_text(encoding="utf-8"))
-            for item in data:
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.error("Failed to read cron jobs file: {}", exc)
+            return
+        for item in data:
+            try:
                 job = CronJob.from_dict(item)
                 self._jobs[job.id] = job
-            logger.debug("Loaded {} cron jobs", len(self._jobs))
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            logger.error("Failed to load cron jobs: {}", exc)
+            except (KeyError, TypeError) as exc:
+                logger.warning("Skipping malformed cron job entry: {}", exc)
+        logger.debug("Loaded {} cron jobs", len(self._jobs))
 
     def _save_jobs(self) -> None:
         """Persist all jobs to the JSON file atomically."""

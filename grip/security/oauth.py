@@ -101,7 +101,7 @@ class OAuthFlow:
         """
         import webbrowser
 
-        code_future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
+        code_future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
 
         server = await self._start_callback_server(code_future)
         try:

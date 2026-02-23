@@ -28,15 +28,31 @@ class SubagentInfo:
     asyncio_task: asyncio.Task[Any] | None = field(default=None, repr=False)
 
 
+_MAX_COMPLETED_AGENTS = 50
+
+
 class SubagentManager:
     """Manages the lifecycle of background subagents.
 
     Subagents are spawned as asyncio tasks and tracked by ID. When a
     subagent finishes, its result is stored and can be retrieved.
+    Completed/failed agents are pruned automatically when the count
+    exceeds _MAX_COMPLETED_AGENTS to prevent unbounded memory growth.
     """
 
     def __init__(self) -> None:
         self._agents: dict[str, SubagentInfo] = {}
+
+    def _prune_completed(self) -> None:
+        """Evict oldest completed/failed/cancelled agents beyond the retention limit."""
+        done = [
+            aid for aid, info in self._agents.items()
+            if info.status in ("completed", "failed", "cancelled")
+        ]
+        excess = len(done) - _MAX_COMPLETED_AGENTS
+        if excess > 0:
+            for aid in done[:excess]:
+                del self._agents[aid]
 
     def spawn(
         self,
@@ -52,6 +68,7 @@ class SubagentManager:
         Returns:
             SubagentInfo with the assigned ID.
         """
+        self._prune_completed()
         agent_id = f"sub_{uuid.uuid4().hex[:8]}"
         info = SubagentInfo(id=agent_id, task_description=task_description)
 

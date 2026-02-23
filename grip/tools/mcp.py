@@ -197,7 +197,7 @@ class MCPConnection:
             self._error = ""
             return self._wrap_tools(tools_response.tools)
 
-        except BaseException as exc:
+        except Exception as exc:
             self._connected = False
             self._error = str(exc)
             logger.error("Failed to connect stdio MCP '{}': {}", self.server_name, exc)
@@ -253,7 +253,7 @@ class MCPConnection:
             self._error = ""
             return self._wrap_tools(tools_response.tools)
 
-        except BaseException as exc:
+        except Exception as exc:
             self._connected = False
             exc_str = str(exc)
             if "401" in exc_str or "Unauthorized" in exc_str:
