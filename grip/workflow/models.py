@@ -8,10 +8,14 @@ edges between them) execute in parallel.
 
 from __future__ import annotations
 
+import re
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
+
+_STEP_NAME_RE = re.compile(r"^[\w-]+$")
 
 
 class StepStatus(StrEnum):
@@ -61,20 +65,35 @@ class StepResult:
         self.status = StepStatus.COMPLETED
         self.output = output
         self.iterations = iterations
+        self._set_completed_time()
+
+    def mark_failed(self, error: str) -> None:
+        self.status = StepStatus.FAILED
+        self.error = error
+        self._set_completed_time()
+
+    def mark_skipped(self, reason: str) -> None:
+        self.status = StepStatus.SKIPPED
+        self.error = reason
+        self._set_completed_time()
+
+    def _set_completed_time(self) -> None:
         self.completed_at = datetime.now(UTC).isoformat()
         if self.started_at:
             start = datetime.fromisoformat(self.started_at)
             end = datetime.fromisoformat(self.completed_at)
             self.duration_seconds = (end - start).total_seconds()
 
-    def mark_failed(self, error: str) -> None:
-        self.status = StepStatus.FAILED
-        self.error = error
-        self.completed_at = datetime.now(UTC).isoformat()
-        if self.started_at:
-            start = datetime.fromisoformat(self.started_at)
-            end = datetime.fromisoformat(self.completed_at)
-            self.duration_seconds = (end - start).total_seconds()
+
+def _build_graph(steps: list[StepDef]) -> tuple[dict[str, list[str]], dict[str, int]]:
+    """Build adjacency list and in-degree map from step definitions."""
+    adj: dict[str, list[str]] = {s.name: [] for s in steps}
+    in_degree: dict[str, int] = {s.name: 0 for s in steps}
+    for step in steps:
+        for dep in step.depends_on:
+            adj[dep].append(step.name)
+            in_degree[step.name] += 1
+    return adj, in_degree
 
 
 @dataclass(slots=True)
@@ -82,6 +101,10 @@ class WorkflowDef:
     """Complete workflow definition: a named DAG of steps.
 
     Steps are validated at load time to ensure:
+      - Non-empty workflow name
+      - At least one step
+      - Valid step names (alphanumeric, underscore, hyphen)
+      - Positive timeout values
       - No duplicate step names
       - All depends_on references point to existing steps
       - No circular dependencies
@@ -94,7 +117,28 @@ class WorkflowDef:
     def validate(self) -> list[str]:
         """Return a list of validation errors (empty = valid)."""
         errors: list[str] = []
+
+        if not self.name or not self.name.strip():
+            errors.append("Workflow name cannot be empty")
+
+        if not self.steps:
+            errors.append("Workflow must have at least one step")
+            return errors
+
         names = {s.name for s in self.steps}
+
+        for step in self.steps:
+            if not step.name or not _STEP_NAME_RE.match(step.name):
+                errors.append(
+                    f"Step name '{step.name}' is invalid "
+                    "(must be non-empty, only alphanumeric/underscore/hyphen)"
+                )
+            if not step.prompt or not step.prompt.strip():
+                errors.append(f"Step '{step.name}' has an empty prompt")
+            if step.timeout_seconds < 1:
+                errors.append(
+                    f"Step '{step.name}' has invalid timeout ({step.timeout_seconds}s); must be >= 1"
+                )
 
         if len(names) != len(self.steps):
             errors.append("Duplicate step names found")
@@ -104,31 +148,13 @@ class WorkflowDef:
                 if dep not in names:
                     errors.append(f"Step '{step.name}' depends on unknown step '{dep}'")
 
-        if not errors and self._has_cycle():
-            errors.append("Circular dependency detected in workflow steps")
+        if not errors:
+            layers = self.get_execution_order()
+            total_in_layers = sum(len(layer) for layer in layers)
+            if total_in_layers != len(self.steps):
+                errors.append("Circular dependency detected in workflow steps")
 
         return errors
-
-    def _has_cycle(self) -> bool:
-        """Detect cycles using iterative topological sort (Kahn's algorithm)."""
-        adj: dict[str, list[str]] = {s.name: [] for s in self.steps}
-        in_degree: dict[str, int] = {s.name: 0 for s in self.steps}
-        for step in self.steps:
-            for dep in step.depends_on:
-                adj[dep].append(step.name)
-                in_degree[step.name] += 1
-
-        queue = [n for n, d in in_degree.items() if d == 0]
-        visited = 0
-        while queue:
-            node = queue.pop(0)
-            visited += 1
-            for neighbor in adj[node]:
-                in_degree[neighbor] -= 1
-                if in_degree[neighbor] == 0:
-                    queue.append(neighbor)
-
-        return visited != len(self.steps)
 
     def get_execution_order(self) -> list[list[str]]:
         """Return steps grouped into parallel execution layers.
@@ -136,25 +162,19 @@ class WorkflowDef:
         Each layer contains steps whose dependencies are all in earlier
         layers, so they can execute concurrently.
         """
-        adj: dict[str, list[str]] = {s.name: [] for s in self.steps}
-        in_degree: dict[str, int] = {s.name: 0 for s in self.steps}
-        for step in self.steps:
-            for dep in step.depends_on:
-                adj[dep].append(step.name)
-                in_degree[step.name] += 1
-
+        adj, in_degree = _build_graph(self.steps)
         layers: list[list[str]] = []
-        queue = [n for n, d in in_degree.items() if d == 0]
+        queue = deque(n for n, d in in_degree.items() if d == 0)
 
         while queue:
-            layers.append(sorted(queue))
-            next_queue: list[str] = []
-            for node in queue:
+            layer = sorted(queue)
+            layers.append(layer)
+            queue.clear()
+            for node in layer:
                 for neighbor in adj[node]:
                     in_degree[neighbor] -= 1
                     if in_degree[neighbor] == 0:
-                        next_queue.append(neighbor)
-            queue = next_queue
+                        queue.append(neighbor)
 
         return layers
 
@@ -182,7 +202,7 @@ class WorkflowDef:
                 prompt=s["prompt"],
                 profile=s.get("profile", "default"),
                 depends_on=s.get("depends_on", []),
-                timeout_seconds=s.get("timeout_seconds", 300),
+                timeout_seconds=int(s.get("timeout_seconds", 300)),
             )
             for s in data.get("steps", [])
         ]
@@ -191,6 +211,9 @@ class WorkflowDef:
             description=data.get("description", ""),
             steps=steps,
         )
+
+
+_RESULT_OUTPUT_LIMIT = 500
 
 
 @dataclass(slots=True)
@@ -222,7 +245,11 @@ class WorkflowRunResult:
             "steps": {
                 name: {
                     "status": r.status.value,
-                    "output": r.output[:500] if r.output else "",
+                    "output": (
+                        r.output[:_RESULT_OUTPUT_LIMIT] + "... [truncated]"
+                        if len(r.output) > _RESULT_OUTPUT_LIMIT
+                        else r.output
+                    ),
                     "error": r.error,
                     "iterations": r.iterations,
                     "duration_seconds": r.duration_seconds,

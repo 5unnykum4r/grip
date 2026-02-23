@@ -8,6 +8,7 @@ from grip.workflow.models import (
     WorkflowDef,
     WorkflowRunResult,
 )
+from grip.workflow.store import WorkflowStore
 
 __all__ = [
     "StepDef",
@@ -16,4 +17,5 @@ __all__ = [
     "WorkflowDef",
     "WorkflowEngine",
     "WorkflowRunResult",
+    "WorkflowStore",
 ]

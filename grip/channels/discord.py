@@ -149,3 +149,34 @@ class DiscordChannel(BaseChannel):
         chunks = self.split_message(text, DISCORD_MAX_MESSAGE_LENGTH)
         for chunk in chunks:
             await channel.send(chunk)
+
+    async def send_file(self, chat_id: str, file_path: str, caption: str = "") -> None:
+        """Send a file to Discord as an attachment."""
+        from pathlib import Path
+
+        import discord
+
+        if not self._client:
+            logger.error("Discord: cannot send file, client not initialized")
+            return
+
+        path = Path(file_path)
+        if not path.is_file():
+            logger.error("Discord: file not found: {}", file_path)
+            await self.send(chat_id, f"File not found: {file_path}")
+            return
+
+        channel = self._client.get_channel(int(chat_id))
+        if not channel:
+            try:
+                channel = await self._client.fetch_channel(int(chat_id))
+            except Exception as exc:
+                logger.error("Discord: channel {} not found: {}", chat_id, exc)
+                return
+
+        try:
+            discord_file = discord.File(path, filename=path.name)
+            await channel.send(content=caption or None, file=discord_file)
+            logger.info("Discord: sent file {} to channel {}", path.name, chat_id)
+        except Exception as exc:
+            logger.error("Discord: failed to send file {}: {}", file_path, exc)

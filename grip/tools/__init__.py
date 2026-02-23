@@ -16,6 +16,7 @@ from grip.tools.scheduler import create_scheduler_tools
 from grip.tools.shell import create_shell_tools
 from grip.tools.spawn import SubagentManager, create_spawn_tools
 from grip.tools.web import create_web_tools
+from grip.tools.workflow import create_workflow_tools
 
 __all__ = [
     "Tool",
@@ -34,6 +35,7 @@ __all__ = [
     "create_shell_tools",
     "create_spawn_tools",
     "create_web_tools",
+    "create_workflow_tools",
 ]
 
 
@@ -58,6 +60,7 @@ def create_default_registry(
     registry.register_many(create_document_gen_tools())
     registry.register_many(create_email_compose_tools())
     registry.register_many(create_scheduler_tools())
+    registry.register_many(create_workflow_tools())
 
     if mcp_servers:
         mcp_manager = MCPManager()

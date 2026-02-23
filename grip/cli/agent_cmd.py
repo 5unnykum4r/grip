@@ -8,6 +8,8 @@ Piped:      cat error.log | grip agent -m "Fix this"
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 import sys
 from collections.abc import Iterable
 from pathlib import Path
@@ -189,6 +191,10 @@ def _build_engine(config: GripConfig) -> tuple[EngineProtocol, SessionManager, M
     memory_mgr = MemoryManager(ws.root)
 
     engine = create_engine(config, ws, session_mgr, memory_mgr)
+
+    from grip.channels.direct import wire_direct_sender
+
+    wire_direct_sender(engine, config.channels)
 
     from grip.skills.loader import SkillsLoader
 
@@ -630,17 +636,41 @@ async def _interactive(config: GripConfig, *, model: str | None, no_markdown: bo
 
                     elif cmd == "/tasks":
                         ws_path = config.agents.defaults.workspace.expanduser().resolve()
-                        cron_dir = ws_path / "cron"
-                        if not cron_dir.exists() or not any(cron_dir.iterdir()):
+                        jobs_file = ws_path / "cron" / "jobs.json"
+                        jobs: list[dict] = []
+                        if jobs_file.exists():
+                            with contextlib.suppress(json.JSONDecodeError, OSError):
+                                jobs = json.loads(jobs_file.read_text(encoding="utf-8"))
+                        if not jobs:
                             console.print("[dim]No scheduled tasks found.[/dim]")
                             continue
-                        lines = []
-                        for f in sorted(cron_dir.iterdir()):
-                            if f.is_file():
-                                lines.append(f"  [cyan]{f.stem}[/cyan]  {f.suffix}")
+                        table = Table(
+                            show_header=True,
+                            header_style="bold",
+                            box=None,
+                            padding=(0, 2),
+                            expand=False,
+                        )
+                        table.add_column("ID", style="cyan", no_wrap=True)
+                        table.add_column("Name", style="white")
+                        table.add_column("Schedule", style="green", no_wrap=True)
+                        table.add_column("Enabled", no_wrap=True)
+                        table.add_column("Prompt", style="dim", max_width=40)
+                        for j in jobs:
+                            enabled = "[green]Yes[/green]" if j.get("enabled", True) else "[red]No[/red]"
+                            prompt_text = j.get("prompt", "")
+                            if len(prompt_text) > 40:
+                                prompt_text = prompt_text[:37] + "..."
+                            table.add_row(
+                                j.get("id", "?"),
+                                j.get("name", "Unnamed"),
+                                j.get("schedule", "?"),
+                                enabled,
+                                prompt_text,
+                            )
                         console.print(
                             Panel(
-                                "\n".join(lines),
+                                table,
                                 title="[bold]Scheduled Tasks[/bold]",
                                 expand=False,
                                 border_style="dim",

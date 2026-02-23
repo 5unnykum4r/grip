@@ -149,3 +149,40 @@ class SlackChannel(BaseChannel):
         chunks = self.split_message(text, SLACK_MAX_MESSAGE_LENGTH)
         for chunk in chunks:
             await self._web_client.chat_postMessage(channel=chat_id, text=chunk)
+
+    async def send_file(self, chat_id: str, file_path: str, caption: str = "") -> None:
+        """Send a file to Slack using files_upload_v2."""
+        from pathlib import Path
+
+        if not self._web_client:
+            logger.error("Slack: cannot send file, web client not initialized")
+            return
+
+        path = Path(file_path)
+        if not path.is_file():
+            logger.error("Slack: file not found: {}", file_path)
+            await self.send(chat_id, f"File not found: {file_path}")
+            return
+
+        try:
+            await self._web_client.files_upload_v2(
+                channel=chat_id,
+                file=str(path),
+                filename=path.name,
+                initial_comment=caption or "",
+            )
+            logger.info("Slack: sent file {} to channel {}", path.name, chat_id)
+        except AttributeError:
+            # Older slack-sdk versions without files_upload_v2
+            try:
+                await self._web_client.files_upload(
+                    channels=chat_id,
+                    file=str(path),
+                    filename=path.name,
+                    initial_comment=caption or "",
+                )
+                logger.info("Slack: sent file {} (v1 upload) to {}", path.name, chat_id)
+            except Exception as exc:
+                logger.error("Slack: failed to send file {}: {}", file_path, exc)
+        except Exception as exc:
+            logger.error("Slack: failed to send file {}: {}", file_path, exc)

@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -30,11 +31,15 @@ class HeartbeatService:
         workspace_root: Path,
         engine: EngineProtocol,
         config: HeartbeatConfig,
+        bus: Any | None = None,
+        reply_to: str = "",
     ) -> None:
         self._workspace_root = workspace_root
         self._heartbeat_file = workspace_root / "HEARTBEAT.md"
         self._engine = engine
         self._config = config
+        self._bus = bus
+        self._reply_to = reply_to
         self._stop_event = asyncio.Event()
 
     async def start(self) -> None:
@@ -77,5 +82,31 @@ class HeartbeatService:
                 result.iterations,
                 result.total_tokens,
             )
+            if self._reply_to and self._bus and result.response:
+                await self._publish_result(result.response)
         except Exception as exc:
             logger.error("Heartbeat run failed: {}", exc)
+            if self._reply_to and self._bus:
+                await self._publish_result(f"Heartbeat run failed: {exc}")
+
+    async def _publish_result(self, text: str) -> None:
+        """Publish a heartbeat result to the message bus for channel delivery."""
+        from grip.bus.events import OutboundMessage
+
+        parts = self._reply_to.split(":", 1)
+        if len(parts) != 2:
+            logger.warning("Invalid reply_to format for heartbeat: {}", self._reply_to)
+            return
+
+        channel, chat_id = parts
+        try:
+            await self._bus.publish_outbound(
+                OutboundMessage(
+                    channel=channel,
+                    chat_id=chat_id,
+                    text=text,
+                )
+            )
+            logger.info("Heartbeat result published to {}:{}", channel, chat_id)
+        except Exception as exc:
+            logger.error("Failed to publish heartbeat result: {}", exc)

@@ -92,7 +92,10 @@ async def _run_gateway(
     # Both services accept Any for their agent_loop parameter and only call
     # .run() on it, which EngineProtocol satisfies.
     cron_svc = CronService(ws.root / "cron", engine, config.cron, bus=bus)
-    heartbeat_svc = HeartbeatService(ws.root, engine, config.heartbeat)
+    heartbeat_svc = HeartbeatService(
+        ws.root, engine, config.heartbeat,
+        bus=bus, reply_to=config.heartbeat.reply_to,
+    )
 
     if config.heartbeat.enabled and config.heartbeat.interval_minutes < 10:
         console.print(

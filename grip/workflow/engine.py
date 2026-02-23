@@ -16,6 +16,7 @@ from loguru import logger
 
 from grip.config.schema import AgentProfile, GripConfig
 from grip.engines.types import EngineProtocol
+from grip.observe.metrics import get_metrics
 from grip.tools.base import ToolRegistry
 from grip.workflow.models import (
     StepDef,
@@ -25,7 +26,8 @@ from grip.workflow.models import (
     WorkflowRunResult,
 )
 
-TEMPLATE_PATTERN = re.compile(r"\{\{(\w+)\.output\}\}")
+TEMPLATE_PATTERN = re.compile(r"\{\{([\w-]+)\.output\}\}")
+MAX_TEMPLATE_OUTPUT_LENGTH = 50_000
 
 
 class WorkflowEngine:
@@ -72,10 +74,17 @@ class WorkflowEngine:
         )
 
         for layer_idx, layer_names in enumerate(layers, 1):
-            logger.info("Executing layer {}/{}: {}", layer_idx, len(layers), layer_names)
+            runnable = [
+                name for name in layer_names
+                if result.step_results[name].status != StepStatus.SKIPPED
+            ]
+            if not runnable:
+                continue
+
+            logger.info("Executing layer {}/{}: {}", layer_idx, len(layers), runnable)
 
             tasks = []
-            for step_name in layer_names:
+            for step_name in runnable:
                 step_def = step_map[step_name]
                 step_result = result.step_results[step_name]
                 resolved_prompt = self._resolve_template(step_def.prompt, result.step_results)
@@ -83,10 +92,9 @@ class WorkflowEngine:
 
             await asyncio.gather(*tasks)
 
-            if any(result.step_results[name].status == StepStatus.FAILED for name in layer_names):
+            if any(result.step_results[name].status == StepStatus.FAILED for name in runnable):
                 logger.warning("Layer {} had failures, skipping dependent steps", layer_idx)
-                self._skip_dependents(layer_names, layers[layer_idx:], result, step_map)
-                break
+                self._skip_dependents(runnable, layers[layer_idx:], result, step_map)
 
         result.completed_at = datetime.now(UTC).isoformat()
         if result.has_failures:
@@ -95,6 +103,8 @@ class WorkflowEngine:
             result.status = "completed"
         else:
             result.status = "partial"
+
+        get_metrics().record_workflow_run()
 
         start = datetime.fromisoformat(result.started_at)
         end = datetime.fromisoformat(result.completed_at)
@@ -145,14 +155,27 @@ class WorkflowEngine:
             logger.error("Step '{}' failed: {}", step_def.name, exc)
 
     @staticmethod
+    def _sanitize_output(output: str) -> str:
+        """Strip template patterns from step output and truncate to prevent injection."""
+        sanitized = TEMPLATE_PATTERN.sub("[template-ref-removed]", output)
+        if len(sanitized) > MAX_TEMPLATE_OUTPUT_LENGTH:
+            sanitized = sanitized[:MAX_TEMPLATE_OUTPUT_LENGTH] + "... [truncated]"
+        return sanitized
+
+    @staticmethod
     def _resolve_template(prompt: str, step_results: dict[str, StepResult]) -> str:
-        """Replace {{step_name.output}} placeholders with actual step outputs."""
+        """Replace {{step_name.output}} placeholders with sanitized step outputs.
+
+        Outputs are stripped of nested template patterns, truncated, and wrapped
+        in delimiters to prevent injection and clarify boundaries for the LLM.
+        """
 
         def replacer(match: re.Match) -> str:
             step_name = match.group(1)
             result = step_results.get(step_name)
             if result and result.status == StepStatus.COMPLETED:
-                return result.output
+                sanitized = WorkflowEngine._sanitize_output(result.output)
+                return f"[output from {step_name}]\n{sanitized}\n[/output from {step_name}]"
             return match.group(0)
 
         return TEMPLATE_PATTERN.sub(replacer, prompt)
@@ -173,6 +196,5 @@ class WorkflowEngine:
             for step_name in layer:
                 step_def = step_map[step_name]
                 if any(dep in failed_set for dep in step_def.depends_on):
-                    result.step_results[step_name].status = StepStatus.SKIPPED
-                    result.step_results[step_name].error = "Skipped due to dependency failure"
+                    result.step_results[step_name].mark_skipped("Skipped due to dependency failure")
                     failed_set.add(step_name)

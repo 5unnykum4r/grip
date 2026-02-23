@@ -65,6 +65,10 @@ def create_api_app(config: GripConfig, config_path: Path | None = None) -> FastA
 
         engine = create_engine(config, ws, session_mgr, memory_mgr)
 
+        from grip.channels.direct import wire_direct_sender
+
+        direct_sender = wire_direct_sender(engine, config.channels)
+
         app.state.config = config
         app.state.config_path = config_path
         app.state.auth_token = auth_token
@@ -88,6 +92,9 @@ def create_api_app(config: GripConfig, config_path: Path | None = None) -> FastA
         logger.info("API server started on {}:{}", config.gateway.host, config.gateway.port)
 
         yield
+
+        if direct_sender:
+            await direct_sender.close()
 
         from grip.pool import shutdown_pools
 

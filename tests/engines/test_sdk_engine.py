@@ -612,7 +612,7 @@ class TestBuildCustomTools:
         tools = runner._build_custom_tools()
         send_fn = _find_tool(tools, "send_message")
         await send_fn({"text": "Hello world", "session_key": "test:session"})
-        callback.assert_called_once_with("Hello world", "test:session")
+        callback.assert_called_once_with("test:session", "Hello world")
 
     @pytest.mark.asyncio
     async def test_send_message_without_callback(
@@ -642,7 +642,7 @@ class TestBuildCustomTools:
                 "session_key": "test:session",
             }
         )
-        callback.assert_called_once_with("/path/to/file.txt", "a caption", "test:session")
+        callback.assert_called_once_with("test:session", "/path/to/file.txt", "a caption")
 
     @pytest.mark.asyncio
     async def test_send_file_without_callback(
