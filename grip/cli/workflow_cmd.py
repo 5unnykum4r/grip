@@ -4,7 +4,8 @@ Subcommands:
   grip workflow list          List saved workflow definitions
   grip workflow show <name>   Show workflow steps and dependencies
   grip workflow run <name>    Execute a workflow
-  grip workflow create        Create a workflow from a JSON file
+  grip workflow create <file> Create a workflow from a JSON file
+  grip workflow edit <file>   Update an existing workflow from modified JSON
   grip workflow delete <name> Delete a saved workflow
 """
 
@@ -177,6 +178,43 @@ def workflow_create(
     store, _ = _get_store()
     path = store.save(wf)
     console.print(f"[green]Workflow '{wf.name}' saved[/green] ({len(wf.steps)} steps) → {path}")
+
+
+@workflow_app.command(name="edit")
+def workflow_edit(
+    file: Path = typer.Argument(help="Path to updated workflow JSON file."),  # noqa: B008
+) -> None:
+    """Update an existing workflow from a modified JSON definition file."""
+    if not file.exists():
+        console.print(f"[red]File not found: {file}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        data = json.loads(file.read_text(encoding="utf-8"))
+        from grip.workflow.models import WorkflowDef
+
+        wf = WorkflowDef.from_dict(data)
+    except (json.JSONDecodeError, KeyError) as exc:
+        console.print(f"[red]Invalid workflow file: {exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    errors = wf.validate()
+    if errors:
+        console.print(f"[red]Validation errors: {'; '.join(errors)}[/red]")
+        raise typer.Exit(1)
+
+    store, _ = _get_store()
+    existing = store.load(wf.name)
+    if not existing:
+        console.print(
+            f"[red]Workflow '{wf.name}' not found. Use 'grip workflow create' for new workflows.[/red]"
+        )
+        raise typer.Exit(1)
+
+    path = store.save(wf)
+    console.print(
+        f"[green]Workflow '{wf.name}' updated[/green] ({len(wf.steps)} steps) -> {path}"
+    )
 
 
 @workflow_app.command(name="delete")

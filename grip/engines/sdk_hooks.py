@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
-from grip.tools.shell import _DENY_PATTERNS
+from grip.tools.shell import _is_dangerous
 
 if TYPE_CHECKING:
     from grip.memory import MemoryManager
@@ -36,20 +36,20 @@ def build_pre_tool_use_hook(
     resolved_workspace = workspace_root.resolve()
 
     def pre_tool_use(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any] | None:
-        # Block dangerous shell commands using the same regex patterns as ShellTool
+        # Block dangerous shell commands using the same multi-layer checks as ShellTool
         if tool_name == "Bash":
             command = tool_input.get("command", "")
-            for pattern in _DENY_PATTERNS:
-                if pattern.search(command):
-                    logger.warning(
-                        "SDK hook blocked dangerous command: {} (pattern: {})",
-                        command[:100],
-                        pattern.pattern,
-                    )
-                    return {
-                        "decision": "block",
-                        "message": f"Blocked: matches dangerous pattern '{pattern.pattern}'",
-                    }
+            danger = _is_dangerous(command)
+            if danger:
+                logger.warning(
+                    "SDK hook blocked dangerous command: {} (reason: {})",
+                    command[:100],
+                    danger,
+                )
+                return {
+                    "decision": "block",
+                    "message": danger,
+                }
 
         # Enforce trust for file operations outside workspace
         if trust_mgr and tool_name in ("Read", "Write", "Edit"):

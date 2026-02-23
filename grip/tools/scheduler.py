@@ -113,6 +113,70 @@ def parse_natural_language(expression: str) -> str | None:
     return None
 
 
+def _load_jobs_file(cron_dir: Path) -> list[dict[str, Any]]:
+    """Load jobs from workspace/cron/jobs.json. Returns empty list on missing/corrupt file."""
+    jobs_file = cron_dir / "jobs.json"
+    if not jobs_file.exists():
+        return []
+    try:
+        data = json.loads(jobs_file.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _save_jobs_file(cron_dir: Path, jobs: list[dict[str, Any]]) -> None:
+    """Persist jobs list to workspace/cron/jobs.json atomically."""
+    cron_dir.mkdir(parents=True, exist_ok=True)
+    jobs_file = cron_dir / "jobs.json"
+    tmp = jobs_file.with_suffix(".tmp")
+    tmp.write_text(json.dumps(jobs, indent=2), encoding="utf-8")
+    tmp.rename(jobs_file)
+
+
+def _migrate_individual_files(cron_dir: Path) -> None:
+    """One-time migration: convert old {id}.json files into jobs.json entries.
+
+    Converts legacy field names (cron -> schedule, command -> prompt) to
+    CronJob-compatible format. Already-migrated files are skipped.
+    """
+    individual_files = [
+        f for f in cron_dir.glob("*.json")
+        if f.name != "jobs.json" and not f.name.endswith(".tmp")
+    ]
+    if not individual_files:
+        return
+
+    jobs = _load_jobs_file(cron_dir)
+    existing_ids = {j.get("id") for j in jobs}
+
+    for f in individual_files:
+        try:
+            entry = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        entry_id = entry.get("id", "")
+        if entry_id in existing_ids:
+            f.unlink()
+            continue
+
+        migrated: dict[str, Any] = {
+            "id": f"cron_{entry_id}" if not entry_id.startswith("cron_") else entry_id,
+            "name": entry.get("name", "Unnamed task"),
+            "schedule": entry.get("cron", entry.get("schedule", "")),
+            "prompt": entry.get("command", entry.get("prompt", "")),
+            "enabled": entry.get("enabled", True),
+            "last_run": entry.get("last_run", None),
+            "created_at": entry.get("created_at", datetime.now(UTC).isoformat()),
+            "reply_to": entry.get("reply_to", ""),
+        }
+        jobs.append(migrated)
+        f.unlink()
+
+    _save_jobs_file(cron_dir, jobs)
+
+
 class SchedulerTool(Tool):
     """Natural language cron scheduling: create, list, and delete tasks."""
 
@@ -169,6 +233,8 @@ class SchedulerTool(Tool):
         cron_dir = ctx.workspace_path / "cron"
         cron_dir.mkdir(parents=True, exist_ok=True)
 
+        _migrate_individual_files(cron_dir)
+
         if action == "create":
             return self._create(params, cron_dir)
         elif action == "list":
@@ -187,6 +253,12 @@ class SchedulerTool(Tool):
         if not schedule:
             return "Error: schedule is required for create action."
 
+        if reply_to and ":" not in reply_to:
+            return (
+                f"Error: invalid reply_to format '{reply_to}'. "
+                "Expected 'channel:chat_id' (e.g. 'telegram:12345')."
+            )
+
         cron_expr = parse_natural_language(schedule)
         if cron_expr is None:
             return (
@@ -195,20 +267,21 @@ class SchedulerTool(Tool):
                 "or a raw cron expression like '*/5 * * * *'."
             )
 
-        task_id = uuid.uuid4().hex[:8]
+        task_id = f"cron_{uuid.uuid4().hex[:8]}"
         entry: dict[str, Any] = {
             "id": task_id,
             "name": task_name,
-            "cron": cron_expr,
-            "command": command,
+            "schedule": cron_expr,
+            "prompt": command,
+            "enabled": True,
+            "last_run": None,
             "created_at": datetime.now(UTC).isoformat(),
-            "original_schedule": schedule,
+            "reply_to": reply_to,
         }
-        if reply_to:
-            entry["reply_to"] = reply_to
 
-        task_file = cron_dir / f"{task_id}.json"
-        task_file.write_text(json.dumps(entry, indent=2), encoding="utf-8")
+        jobs = _load_jobs_file(cron_dir)
+        jobs.append(entry)
+        _save_jobs_file(cron_dir, jobs)
 
         result = (
             f"Scheduled task created:\n"
@@ -216,41 +289,38 @@ class SchedulerTool(Tool):
             f"  Name: {task_name}\n"
             f"  Cron: {cron_expr}\n"
             f"  Schedule: {schedule}\n"
-            f"  Command: {command}"
+            f"  Prompt: {command}"
         )
         if reply_to:
             result += f"\n  Reply to: {reply_to}"
         return result
 
     def _list(self, cron_dir: Path) -> str:
-        task_files = sorted(cron_dir.glob("*.json"))
-        if not task_files:
+        jobs = _load_jobs_file(cron_dir)
+        if not jobs:
             return "No scheduled tasks found."
 
         lines = ["## Scheduled Tasks\n"]
-        for tf in task_files:
-            try:
-                entry = json.loads(tf.read_text(encoding="utf-8"))
-                lines.append(
-                    f"- **{entry['name']}** (ID: {entry['id']})\n"
-                    f"  Cron: `{entry['cron']}` | Command: {entry.get('command', 'N/A')}"
-                )
-            except Exception:
-                continue
+        for entry in jobs:
+            enabled = "enabled" if entry.get("enabled", True) else "disabled"
+            lines.append(
+                f"- **{entry.get('name', 'Unnamed')}** (ID: {entry.get('id', '?')}) [{enabled}]\n"
+                f"  Schedule: `{entry.get('schedule', 'N/A')}` | Prompt: {entry.get('prompt', 'N/A')}"
+            )
         return "\n".join(lines)
 
     def _delete(self, params: dict[str, Any], cron_dir: Path) -> str:
         task_id = params.get("task_id", "")
         if not task_id:
             return "Error: task_id is required for delete action."
-        if "/" in task_id or "\\" in task_id or ".." in task_id:
-            return "Error: invalid task_id."
 
-        task_file = cron_dir / f"{task_id}.json"
-        if not task_file.exists():
+        jobs = _load_jobs_file(cron_dir)
+        filtered = [j for j in jobs if j.get("id") != task_id]
+
+        if len(filtered) == len(jobs):
             return f"Error: no scheduled task found with ID '{task_id}'."
 
-        task_file.unlink()
+        _save_jobs_file(cron_dir, filtered)
         return f"Deleted scheduled task: {task_id}"
 
 

@@ -319,6 +319,11 @@ class HeartbeatConfig(BaseModel):
         le=1440,
         description="Minutes between heartbeat runs. Minimum 5 to prevent excessive token usage.",
     )
+    reply_to: str = Field(
+        default="",
+        description="Session key for channel delivery (e.g. 'telegram:12345'). "
+        "When set, heartbeat results are published to the message bus.",
+    )
 
 
 class CronConfig(BaseModel):

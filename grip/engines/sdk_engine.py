@@ -229,9 +229,9 @@ class SDKRunner(EngineProtocol):
             if cb is None:
                 return runner._text_result("Send callback not configured; message not delivered.")
             if inspect.iscoroutinefunction(cb):
-                result = await cb(args["text"], args["session_key"])
+                result = await cb(args["session_key"], args["text"])
             else:
-                result = await asyncio.to_thread(cb, args["text"], args["session_key"])
+                result = await asyncio.to_thread(cb, args["session_key"], args["text"])
             return runner._text_result(str(result))
 
         @tool(
@@ -244,9 +244,9 @@ class SDKRunner(EngineProtocol):
             if cb is None:
                 return runner._text_result("Send file callback not configured; file not delivered.")
             if inspect.iscoroutinefunction(cb):
-                result = await cb(args["file_path"], args["caption"], args["session_key"])
+                result = await cb(args["session_key"], args["file_path"], args["caption"])
             else:
-                result = await asyncio.to_thread(cb, args["file_path"], args["caption"], args["session_key"])
+                result = await asyncio.to_thread(cb, args["session_key"], args["file_path"], args["caption"])
             return runner._text_result(str(result))
 
         @tool(

@@ -6,6 +6,7 @@ communicate results without waiting for the full agent loop to finish.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from typing import Any
 
@@ -55,18 +56,36 @@ class MessageTool(Tool):
                     "type": "string",
                     "description": "Message text to send to the user.",
                 },
+                "channel": {
+                    "type": "string",
+                    "description": (
+                        "Target channel (telegram, discord, slack). "
+                        "Omit to use the current session's channel."
+                    ),
+                },
+                "chat_id": {
+                    "type": "string",
+                    "description": (
+                        "Target chat/channel ID on the platform. "
+                        "Required when channel is specified."
+                    ),
+                },
             },
             "required": ["text"],
         }
 
     async def execute(self, params: dict[str, Any], ctx: ToolContext) -> str:
         text = params["text"]
+        channel = params.get("channel")
+        chat_id = params.get("chat_id")
+        target_key = f"{channel}:{chat_id}" if channel and chat_id else ctx.session_key
 
         if self._callback:
             try:
-                result = self._callback(ctx.session_key, text)
-                if hasattr(result, "__await__"):
-                    await result
+                if inspect.iscoroutinefunction(self._callback):
+                    await self._callback(target_key, text)
+                else:
+                    self._callback(target_key, text)
                 logger.debug("Message sent via callback: {}...", text[:80])
                 return f"Message sent: {text[:100]}"
             except Exception as exc:
@@ -118,6 +137,20 @@ class SendFileTool(Tool):
                     "type": "string",
                     "description": "Optional caption or description for the file.",
                 },
+                "channel": {
+                    "type": "string",
+                    "description": (
+                        "Target channel (telegram, discord, slack). "
+                        "Omit to use the current session's channel."
+                    ),
+                },
+                "chat_id": {
+                    "type": "string",
+                    "description": (
+                        "Target chat/channel ID on the platform. "
+                        "Required when channel is specified."
+                    ),
+                },
             },
             "required": ["file_path"],
         }
@@ -127,6 +160,9 @@ class SendFileTool(Tool):
 
         file_path = params["file_path"]
         caption = params.get("caption", "")
+        channel = params.get("channel")
+        chat_id = params.get("chat_id")
+        target_key = f"{channel}:{chat_id}" if channel and chat_id else ctx.session_key
 
         path = Path(file_path)
         if not path.is_file():
@@ -134,9 +170,10 @@ class SendFileTool(Tool):
 
         if self._callback:
             try:
-                result = self._callback(ctx.session_key, file_path, caption)
-                if hasattr(result, "__await__"):
-                    await result
+                if inspect.iscoroutinefunction(self._callback):
+                    await self._callback(target_key, file_path, caption)
+                else:
+                    self._callback(target_key, file_path, caption)
                 logger.debug("File sent via callback: {}", path.name)
                 return f"File sent: {path.name}"
             except Exception as exc:

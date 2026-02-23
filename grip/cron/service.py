@@ -69,6 +69,7 @@ class CronService:
         self._running = False
         self._check_interval = 30
         self._pending_tasks: set[asyncio.Task] = set()
+        self._executing: set[str] = set()
 
         self._load_jobs()
 
@@ -171,10 +172,13 @@ class CronService:
 
     async def _check_and_run_due_jobs(self) -> None:
         """Check all enabled jobs and run any that are due."""
+        self._load_jobs()
         now = datetime.now(UTC)
 
         for job in list(self._jobs.values()):
             if not job.enabled:
+                continue
+            if job.id in self._executing:
                 continue
 
             if self._is_job_due(job, now):
@@ -236,41 +240,47 @@ class CronService:
         If the job has a reply_to session key and a message bus is available,
         the result is published to the bus so the originating channel
         (e.g. Telegram) receives the response.
+
+        Uses self._executing to prevent the same job from being re-fired
+        while a previous execution is still in progress.
         """
-        logger.info("Executing cron job: {} ({})", job.name, job.id)
-        job.last_run = datetime.now(UTC).isoformat()
-        self._save_jobs()
-
-        timeout = self._config.exec_timeout_minutes * 60
-        session_key = f"cron:{job.id}"
-
+        self._executing.add(job.id)
         try:
-            result = await asyncio.wait_for(
-                self._engine.run(job.prompt, session_key=session_key),
-                timeout=timeout,
-            )
-            logger.info(
-                "Cron job {} completed: {} iterations, response length {}",
-                job.id,
-                result.iterations,
-                len(result.response),
-            )
+            logger.info("Executing cron job: {} ({})", job.name, job.id)
+            job.last_run = datetime.now(UTC).isoformat()
+            self._save_jobs()
 
-            # Route the result to the originating channel if reply_to is set
-            if job.reply_to and self._bus and result.response:
-                await self._publish_result(job, result.response)
+            timeout = self._config.exec_timeout_minutes * 60
+            session_key = f"cron:{job.id}"
 
-        except TimeoutError:
-            logger.error("Cron job {} timed out after {}s", job.id, timeout)
-            if job.reply_to and self._bus:
-                await self._publish_result(
-                    job,
-                    f"Cron job '{job.name}' timed out after {self._config.exec_timeout_minutes} minutes.",
+            try:
+                result = await asyncio.wait_for(
+                    self._engine.run(job.prompt, session_key=session_key),
+                    timeout=timeout,
                 )
-        except Exception as exc:
-            logger.error("Cron job {} failed: {}", job.id, exc)
-            if job.reply_to and self._bus:
-                await self._publish_result(job, f"Cron job '{job.name}' failed: {exc}")
+                logger.info(
+                    "Cron job {} completed: {} iterations, response length {}",
+                    job.id,
+                    result.iterations,
+                    len(result.response),
+                )
+
+                if job.reply_to and self._bus and result.response:
+                    await self._publish_result(job, result.response)
+
+            except TimeoutError:
+                logger.error("Cron job {} timed out after {}s", job.id, timeout)
+                if job.reply_to and self._bus:
+                    await self._publish_result(
+                        job,
+                        f"Cron job '{job.name}' timed out after {self._config.exec_timeout_minutes} minutes.",
+                    )
+            except Exception as exc:
+                logger.error("Cron job {} failed: {}", job.id, exc)
+                if job.reply_to and self._bus:
+                    await self._publish_result(job, f"Cron job '{job.name}' failed: {exc}")
+        finally:
+            self._executing.discard(job.id)
 
     async def _publish_result(self, job: CronJob, text: str) -> None:
         """Publish a cron job result to the message bus for channel delivery."""
