@@ -159,7 +159,7 @@ async def _wait_for_oauth_callback(
 
     Returns (authorization_code, state_or_none) extracted from the callback URL.
     """
-    result_future: asyncio.Future[tuple[str, str | None]] = asyncio.get_event_loop().create_future()
+    result_future: asyncio.Future[tuple[str, str | None]] = asyncio.get_running_loop().create_future()
 
     async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:

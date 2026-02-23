@@ -115,7 +115,13 @@ class DiscordChannel(BaseChannel):
             await bus.push_inbound(msg)
 
         self._task = asyncio.create_task(self._client.start(token), name="discord-bot")
-        await self._ready_event.wait()
+        try:
+            await asyncio.wait_for(self._ready_event.wait(), timeout=30)
+        except TimeoutError as exc:
+            raise RuntimeError(
+                "Discord bot failed to connect within 30 seconds. "
+                "Check bot token and network connectivity."
+            ) from exc
         logger.info("Discord channel started")
 
     async def stop(self) -> None:

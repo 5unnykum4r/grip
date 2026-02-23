@@ -11,6 +11,7 @@ agentic looping, and context management to the Claude Agent SDK. Grip handles:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import os
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -227,7 +228,10 @@ class SDKRunner(EngineProtocol):
             cb = runner._send_callback
             if cb is None:
                 return runner._text_result("Send callback not configured; message not delivered.")
-            result = await asyncio.to_thread(cb, args["text"], args["session_key"])
+            if inspect.iscoroutinefunction(cb):
+                result = await cb(args["text"], args["session_key"])
+            else:
+                result = await asyncio.to_thread(cb, args["text"], args["session_key"])
             return runner._text_result(str(result))
 
         @tool(
@@ -239,7 +243,10 @@ class SDKRunner(EngineProtocol):
             cb = runner._send_file_callback
             if cb is None:
                 return runner._text_result("Send file callback not configured; file not delivered.")
-            result = await asyncio.to_thread(cb, args["file_path"], args["caption"], args["session_key"])
+            if inspect.iscoroutinefunction(cb):
+                result = await cb(args["file_path"], args["caption"], args["session_key"])
+            else:
+                result = await asyncio.to_thread(cb, args["file_path"], args["caption"], args["session_key"])
             return runner._text_result(str(result))
 
         @tool(

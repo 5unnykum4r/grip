@@ -48,7 +48,9 @@ class TrustManager:
     def _save(self) -> None:
         self._state_file.parent.mkdir(parents=True, exist_ok=True)
         data = {"directories": sorted(self._trusted)}
-        self._state_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp = self._state_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp.rename(self._state_file)
 
     def set_prompt(self, callback: TrustPrompt) -> None:
         """Set the async callback used to prompt the user for trust decisions."""

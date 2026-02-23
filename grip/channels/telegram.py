@@ -33,6 +33,14 @@ from grip.config.schema import ChannelEntry
 
 TELEGRAM_MAX_MESSAGE_LENGTH = 4096
 
+
+def _parse_chat_id(chat_id: str) -> int | str:
+    """Convert chat_id to int if numeric, otherwise return as-is for @channel names."""
+    try:
+        return int(chat_id)
+    except ValueError:
+        return chat_id
+
 # Telegram HTML mode only supports a small set of tags. We convert
 # common Markdown patterns the LLM produces into HTML equivalents.
 _MD_TO_HTML_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -48,8 +56,8 @@ _MD_TO_HTML_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)"), r"<i>\1</i>"),
     # Strikethrough: ~~text~~ -> <s>text</s>
     (re.compile(r"~~(.+?)~~"), r"<s>\1</s>"),
-    # Links: [text](url) -> <a href="url">text</a>
-    (re.compile(r"\[([^\]]+)\]\(([^)]+)\)"), r'<a href="\2">\1</a>'),
+    # Links: [text](url) -> <a href="url">text</a> (only http/https to prevent javascript: injection)
+    (re.compile(r"\[([^\]]+)\]\((https?://[^)]+)\)"), r'<a href="\2">\1</a>'),
 ]
 
 # Single source of truth for bot commands.
@@ -426,7 +434,7 @@ class TelegramChannel(BaseChannel):
         for chunk in chunks:
             try:
                 await self._app.bot.send_message(
-                    chat_id=int(chat_id),
+                    chat_id=_parse_chat_id(chat_id),
                     text=chunk,
                     parse_mode="HTML",
                     disable_web_page_preview=True,
@@ -437,7 +445,7 @@ class TelegramChannel(BaseChannel):
                 plain_chunk = re.sub(r"<[^>]+>", "", chunk)
                 try:
                     await self._app.bot.send_message(
-                        chat_id=int(chat_id),
+                        chat_id=_parse_chat_id(chat_id),
                         text=plain_chunk,
                     )
                 except Exception as fallback_exc:
@@ -469,14 +477,14 @@ class TelegramChannel(BaseChannel):
             with open(path, "rb") as f:
                 if is_image:
                     await self._app.bot.send_photo(
-                        chat_id=int(chat_id),
+                        chat_id=_parse_chat_id(chat_id),
                         photo=f,
                         caption=html_caption or None,
                         parse_mode="HTML" if html_caption else None,
                     )
                 else:
                     await self._app.bot.send_document(
-                        chat_id=int(chat_id),
+                        chat_id=_parse_chat_id(chat_id),
                         document=f,
                         filename=path.name,
                         caption=html_caption or None,
@@ -492,13 +500,13 @@ class TelegramChannel(BaseChannel):
                 with open(path, "rb") as f:
                     if is_image:
                         await self._app.bot.send_photo(
-                            chat_id=int(chat_id),
+                            chat_id=_parse_chat_id(chat_id),
                             photo=f,
                             caption=caption[:1024] if caption else None,
                         )
                     else:
                         await self._app.bot.send_document(
-                            chat_id=int(chat_id),
+                            chat_id=_parse_chat_id(chat_id),
                             document=f,
                             filename=path.name,
                             caption=caption[:1024] if caption else None,
