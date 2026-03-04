@@ -378,7 +378,7 @@ class SDKRunner(EngineProtocol):
         extra_args: dict[str, str | None] = {}
         sdk_effort = self._config.agents.defaults.sdk_effort
         if sdk_effort:
-            extra_args["--effort"] = sdk_effort
+            extra_args["effort"] = sdk_effort
 
         options = ClaudeAgentOptions(
             model=effective_model,
