@@ -32,7 +32,7 @@ def _check_root() -> None:
         "Running as root gives it unrestricted access to the entire system.\n"
         "This is strongly discouraged — use a non-root user instead.[/yellow]\n"
     )
-    if not Confirm.ask("[bold]Continue as root?[/bold]", default=False, console=_console):
+    if sys.stdin.isatty() and not Confirm.ask("[bold]Continue as root?[/bold]", default=False, console=_console):
         _console.print("[dim]Exiting.[/dim]")
         sys.exit(1)
 
