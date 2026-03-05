@@ -1,6 +1,6 @@
 [project]
 name = "grip-ai"
-version = "1.2.1"
+version = "1.3.0"
 description = "Claude Agent SDK powered AI agent platform with multi-model fallback, tool execution, and multi-channel chat integration."
 readme = "README.md"
 license = "MIT"
