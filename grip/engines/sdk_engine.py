@@ -363,6 +363,12 @@ class SDKRunner(EngineProtocol):
         custom_tool_names = [f"mcp__grip_tools__{t.name}" for t in custom_tools]
         allowed_tools.extend(custom_tool_names)
 
+        # Adaptive thinking via --effort flag
+        extra_args: dict[str, str | None] = {}
+        sdk_effort = self._config.agents.defaults.sdk_effort
+        if sdk_effort:
+            extra_args["effort"] = sdk_effort
+
         env_opts: dict[str, str] = {
             # Prevent the Claude CLI from refusing to start when grip is
             # invoked from inside a Claude Code session (nested session guard).
@@ -382,6 +388,7 @@ class SDKRunner(EngineProtocol):
             cwd=self._cwd,
             allowed_tools=allowed_tools if allowed_tools else None,
             env=env_opts if env_opts else None,
+            extra_args=extra_args if extra_args else {},
         )
 
         tool_calls_made: list[str] = []
